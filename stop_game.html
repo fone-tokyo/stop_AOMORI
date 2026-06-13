@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🃏 ストップ — カードゲーム</title>
+<style>
+/* === ライトテーマ 固定色 === */
+:root {
+  --bg:        #F5F5F0;
+  --bg2:       #EBEBЕ6;
+  --surface:   #FFFFFF;
+  --border:    #E0DFD8;
+  --border2:   #D0CFC8;
+  --text:      #1A1A18;
+  --text2:     #6B6B65;
+  --text3:     #9B9B95;
+  --green:     #1D9E75;
+  --green-dk:  #0F6E56;
+  --green-lt:  #E1F5EE;
+  --red:       #D85A30;
+  --red-dk:    #993C1D;
+  --amber:     #BA7517;
+  --amber-dk:  #854F0B;
+  --amber-lt:  #FAEEDA;
+  --purple:    #534AB7;
+  --purple-dk: #3C3489;
+  --purple-lt: #EEEDFE;
+  --purple-bd: #7F77DD;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:var(--text);min-height:100vh}
+#app{max-width:420px;margin:0 auto;padding:12px}
+.scr{display:none}.scr.on{display:block}
+
+/* topbar */
+.topbar{background:var(--surface);border-radius:14px;padding:11px 16px;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;border:1px solid var(--border)}
+.topbar h1{font-size:17px;font-weight:600;color:var(--text)}
+.topbar .sub{font-size:12px;color:var(--text2)}
+
+/* box */
+.box{background:var(--surface);border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--border)}
+.stitle{font-size:13px;color:var(--text2);margin-bottom:9px;font-weight:500}
+
+/* buttons */
+.btn{display:block;width:100%;padding:12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);font-size:14px;font-weight:600;cursor:pointer;color:var(--text);margin-bottom:8px;text-align:center;transition:opacity .12s,transform .1s}
+.btn:active{transform:scale(0.97);opacity:.85}
+.btn.pri{background:var(--green);border-color:var(--green-dk);color:#fff}
+.btn.war{background:var(--amber);border-color:var(--amber-dk);color:#fff}
+.btn.dan{background:var(--red);border-color:var(--red-dk);color:#fff}
+.btn.sec{background:var(--bg);color:var(--text2);border-color:var(--border2)}
+.btn:disabled{opacity:.35;cursor:not-allowed}
+.brow{display:flex;gap:8px;margin-bottom:8px}.brow .btn{margin-bottom:0;flex:1}
+
+/* cards */
+.crow{display:flex;flex-wrap:wrap;gap:6px}
+
+/* msg */
+.msg{background:var(--bg);border-radius:10px;padding:11px 14px;margin-bottom:10px;font-size:13px;color:var(--text2);min-height:40px;line-height:1.55;border:1px solid var(--border)}
+
+/* badge */
+.bdg{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;margin-left:6px;font-weight:500}
+.bg{background:var(--green-lt);color:var(--green-dk)}
+.bp{background:var(--purple-lt);color:var(--purple)}
+.bw{background:var(--amber-lt);color:var(--amber-dk)}
+
+/* field melds */
+.mw{background:var(--bg);border-radius:10px;padding:8px 10px;margin-bottom:7px;border:1.5px solid transparent;transition:border-color .15s}
+.mw.addtarget{border-color:var(--green);cursor:pointer;background:var(--green-lt)}
+.ml{font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:500}
+
+/* log */
+.logrow{font-size:12px;color:var(--text2);padding:5px 0;border-bottom:1px solid var(--border)}
+.logrow:last-child{border-bottom:none}
+
+/* modal */
+.mbg{background:rgba(0,0,0,.5);position:fixed;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.mbox{background:var(--surface);border-radius:16px;padding:20px;width:100%;max-width:380px;border:1px solid var(--border);box-shadow:0 8px 32px rgba(0,0,0,.15)}
+.mbox h2{font-size:16px;font-weight:700;margin-bottom:10px;color:var(--text)}
+.rrow{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:14px}
+
+/* reveal */
+.reveal-area{margin:8px 0;padding:9px;background:var(--bg);border-radius:10px}
+.reveal-name{font-size:12px;color:var(--text2);margin-bottom:7px;font-weight:500}
+
+/* hint bars */
+.add-hint{background:var(--green-lt);border:1px solid var(--green);border-radius:10px;padding:9px 13px;margin-bottom:8px;font-size:13px;color:var(--green-dk);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.swap-hint{background:var(--amber-lt);border:1px solid #EF9F27;border-radius:10px;padding:9px 13px;margin-bottom:8px;font-size:13px;color:var(--amber-dk);display:flex;align-items:center;justify-content:space-between;gap:8px}
+
+/* JK panel */
+.jk-panel{background:var(--purple-lt);border:1px solid var(--purple-bd);border-radius:10px;padding:11px 13px;margin-bottom:8px}
+.jk-panel-title{font-size:12px;color:var(--purple);margin-bottom:9px;font-weight:600}
+.jk-opt{display:flex;align-items:center;gap:9px;padding:8px 11px;border-radius:9px;border:1px solid #AFA9EC;background:var(--surface);cursor:pointer;margin-bottom:7px;font-size:13px;color:var(--text);transition:background .1s}
+.jk-opt:last-child{margin-bottom:0}.jk-opt:active{background:var(--purple-lt)}
+.jk-preview{display:flex;gap:3px;flex-wrap:wrap}
+
+/* input */
+input[type=text]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--border2);font-size:14px;background:var(--bg);color:var(--text);outline:none}
+input[type=text]:focus{border-color:var(--green)}
+
+/* result table */
+.rtable{width:100%;border-collapse:collapse;font-size:14px}
+.rtable th{text-align:left;padding:6px 0;font-size:12px;color:var(--text2);font-weight:500;border-bottom:1px solid var(--border)}
+.rtable td{padding:7px 0;border-bottom:1px solid var(--border)}
+.rtable .win{color:var(--green);font-weight:600}
+
+/* score badge */
+.score-pos{color:var(--green);font-weight:700}
+.score-neg{color:var(--red);font-weight:700}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- SETUP -->
+<div id="scr-setup" class="scr on">
+  <div class="topbar"><h1>🃏 ストップ</h1><span class="sub">β版 — 1人用 vs CPU</span></div>
+  <div class="box">
+    <div class="stitle">あなたの名前</div>
+    <input id="inp-name" type="text" value="あなた" placeholder="名前を入力">
+  </div>
+  <div class="box">
+    <div class="stitle">CPU難易度</div>
+    <div class="brow">
+      <button class="btn sec" id="d-easy">かんたん</button>
+      <button class="btn pri" id="d-normal">ふつう</button>
+      <button class="btn sec" id="d-hard">むずかしい</button>
+    </div>
+  </div>
+  <div class="box" style="font-size:12px;color:var(--text2);line-height:1.7">
+    <div style="font-weight:600;margin-bottom:6px;color:var(--text)">📋 基本ルール</div>
+    手札7枚からスタート。山札か捨て札から1枚引いて、同じ数字3枚以上・同じ絵柄の連番3枚以上を場に出す。手札0枚で上がり。<br>
+    <span style="color:var(--green);font-weight:600">ストップ宣言</span>は引く前に！手札の合計が最小なら勝ち。
+  </div>
+  <button class="btn pri" id="btn-start">ゲームスタート ↗</button>
+</div>
+
+<!-- GAME -->
+<div id="scr-game" class="scr">
+  <div class="topbar"><h1 id="g-turn">— のターン</h1><span class="sub" id="g-round">R1/10</span></div>
+  <div class="box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px">
+      <span style="font-size:14px;font-weight:600;color:var(--text)" id="g-cpu-name">CPU</span>
+      <span style="font-size:13px;color:var(--text2)" id="g-cpu-info">7枚 / 0pt</span>
+    </div>
+    <div class="crow" id="g-cpu-hand"></div>
+  </div>
+  <div class="box"><div class="stitle" id="g-field-title">場札</div><div id="g-field"></div></div>
+  <div style="display:flex;gap:14px;margin-bottom:10px;align-items:flex-end">
+    <div style="text-align:center">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:500">山札</div>
+      <div id="btn-deck" style="width:48px;height:68px;border-radius:8px;background:var(--purple);border:1px solid var(--purple-dk);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;cursor:pointer">🂠</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px" id="g-deck-n">--</div>
+    </div>
+    <div style="font-size:20px;color:var(--text3);padding-bottom:20px">→</div>
+    <div style="text-align:center">
+      <div style="font-size:11px;color:var(--text2);margin-bottom:5px;font-weight:500">捨て札</div>
+      <div id="g-disc-top" style="cursor:pointer;min-width:48px;min-height:68px"></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px" id="g-disc-n">--</div>
+    </div>
+  </div>
+  <div class="box"><div class="stitle" id="g-my-lbl">あなたの手札</div><div class="crow" id="g-my-hand"></div></div>
+  <div id="g-add-hint" style="display:none"></div>
+  <div id="g-jk-panel" style="display:none"></div>
+  <div id="g-swap-hint" style="display:none"></div>
+  <div id="g-cancel-add" style="display:none"><button class="btn sec" id="btn-cancel-add" style="margin-bottom:8px">キャンセル</button></div>
+  <div class="msg" id="g-msg">準備中…</div>
+  <div id="g-act-draw" style="display:none">
+    <div class="brow">
+      <button class="btn pri" id="btn-draw-deck">山札から引く</button>
+      <button class="btn sec" id="btn-draw-disc">捨て札を取る</button>
+    </div>
+    <button class="btn dan" id="btn-stop">🛑 ストップ宣言（引く前）</button>
+  </div>
+  <div id="g-act-play" style="display:none">
+    <div class="brow">
+      <button class="btn pri" id="btn-play">選択を場に出す（3枚以上）</button>
+      <button class="btn sec" id="btn-discard">1枚捨てる</button>
+    </div>
+    <button class="btn dan" id="btn-parent-stop" style="display:none">🛑 ストップ宣言（親の一発）</button>
+  </div>
+  <div id="g-modal"></div>
+  <div class="box" style="margin-top:6px"><div class="stitle">ログ</div><div id="g-log"></div></div>
+</div>
+
+<!-- RESULT -->
+<div id="scr-result" class="scr">
+  <div class="topbar"><h1>ラウンド結果</h1><span class="sub" id="r-round">R1</span></div>
+  <div id="r-body"></div>
+  <button class="btn pri" id="r-next">次のラウンドへ ↗</button>
+  <button class="btn sec" id="r-end">終了する</button>
+</div>
+
+<!-- END -->
+<div id="scr-end" class="scr">
+  <div class="topbar"><h1>ゲーム終了</h1><span class="sub">最終結果</span></div>
+  <div id="e-body"></div>
+  <button class="btn pri" id="e-restart">もう一度プレイ ↗</button>
+</div>
+
+</div><!-- #app -->
+
+<script>
+var SUITS=['♠','♥','♦','♣'];
+var SC={'♠':'#1A1A18','♥':'#D85A30','♦':'#D85A30','♣':'#1A1A18'};
+var VN={1:'A',11:'J',12:'Q',13:'K'};
+var DIFF='normal';
+var G=null;
+var ADD_MODE=false;
+
+/* ===== ボタンバインド ===== */
+document.getElementById('d-easy').addEventListener('click',function(){setDiff('easy');});
+document.getElementById('d-normal').addEventListener('click',function(){setDiff('normal');});
+document.getElementById('d-hard').addEventListener('click',function(){setDiff('hard');});
+document.getElementById('btn-start').addEventListener('click',startGame);
+document.getElementById('btn-deck').addEventListener('click',drawDeck);
+document.getElementById('btn-draw-deck').addEventListener('click',drawDeck);
+document.getElementById('btn-draw-disc').addEventListener('click',drawDisc);
+document.getElementById('g-disc-top').addEventListener('click',drawDisc);
+document.getElementById('btn-stop').addEventListener('click',doStop);
+document.getElementById('btn-parent-stop').addEventListener('click',doParentFirstStop);
+document.getElementById('btn-play').addEventListener('click',doPlayNew);
+document.getElementById('btn-discard').addEventListener('click',doDiscard);
+document.getElementById('btn-cancel-add').addEventListener('click',cancelAddMode);
+document.getElementById('r-next').addEventListener('click',nextRound);
+document.getElementById('r-end').addEventListener('click',goEnd);
+document.getElementById('e-restart').addEventListener('click',resetGame);
+document.addEventListener('click',function(e){
+  var opt=e.target.closest('.jk-opt');
+  if(opt){execJokerAdd(parseInt(opt.dataset.mi),opt.dataset.pos,parseInt(opt.dataset.asval));}
+});
+
+/* ===== ユーティリティ ===== */
+function setDiff(d){
+  DIFF=d;
+  ['easy','normal','hard'].forEach(function(x){
+    var b=document.getElementById('d-'+x);
+    if(b)b.className=x===d?'btn pri':'btn sec';
+  });
+}
+function vn(v){return VN[v]||String(v)}
+function cl(c){return c.joker?'JK':c.suit+vn(c.val)}
+function cardColor(c){return c.joker?'#534AB7':SC[c.suit]||'#1A1A18';}
+function cardBg(c){return c.joker?'#EEEDFE':'#FFFFFF';}
+function cardBorder(c){return c.joker?'#7F77DD':'#E0DFD8';}
+
+function makeDeck(){
+  var d=[];
+  SUITS.forEach(function(s){[1,2,3,4,5,6,7,8,9,10,11,12,13].forEach(function(v){d.push({suit:s,val:v,id:s+v});});});
+  d.push({joker:true,id:'JK1'});d.push({joker:true,id:'JK2'});
+  return d;
+}
+function sfl(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function showScr(id){['setup','game','result','end'].forEach(function(x){var el=document.getElementById('scr-'+x);if(el)el.className='scr'+(x===id?' on':'');});}
+function setMsg(m){var b=document.getElementById('g-msg');if(b)b.textContent=m;}
+function addLog(m){
+  var l=document.getElementById('g-log');if(!l)return;
+  var d=document.createElement('div');d.className='logrow';d.textContent=m;
+  l.insertBefore(d,l.firstChild);if(l.children.length>18)l.removeChild(l.lastChild);
+}
+
+/* ===== ゲーム初期化 ===== */
+function startGame(){
+  var ne=document.getElementById('inp-name');var name=ne?ne.value.trim():'あなた';if(!name)name='あなた';
+  G={
+    ps:[{name:name,hand:[],score:0,cpu:false},{name:'CPU',hand:[],score:0,cpu:true}],
+    deck:[],disc:[],field:[],cur:0,parent:0,round:1,maxR:10,
+    phase:'draw',sel:[],ti:0,fd:false,thinking:false,flowMul:1
+  };
+  ADD_MODE=false;dealRound();
+}
+function dealRound(){
+  G.deck=sfl(makeDeck());G.disc=[];G.field=[];G.sel=[];
+  G.phase='draw';G.ti=0;G.fd=false;G.thinking=false;ADD_MODE=false;
+  G.ps[0].hand=[];G.ps[1].hand=[];
+  for(var i=0;i<7;i++){G.ps[0].hand.push(G.deck.pop());G.ps[1].hand.push(G.deck.pop());}
+  G.disc.push(G.deck.pop());
+  showScr('game');render();
+  setMsg(G.ps[G.cur].name+'のターンです。'+(G.flowMul>1?'（流れ×'+G.flowMul+'倍！）':''));
+  if(G.ps[G.cur].cpu)setTimeout(cpuTurn,800);
+}
+
+/* ===== スコア計算 ===== */
+function hsum(p){return p.hand.reduce(function(s,c){return s+(c.joker?0:c.val);},0);}
+function hsumStop(p,isStopper){return p.hand.reduce(function(s,c){return s+(c.joker?(isStopper?1:0):c.val);},0);}
+function isJokerTrapped(p){
+  if(!p.hand.length)return false;
+  if(!p.hand.every(function(c){return c.joker;}))return false;
+  for(var i=0;i<G.field.length;i++){if(valMeldAdd(G.field[i],p.hand[0]))return false;}
+  return true;
+}
+function getMultiInfo(isParentFirst){
+  var mul,label;
+  if(isParentFirst){mul=4;label='親の一発ストップ';}
+  else if(!G.fd&&G.cur!==G.parent){mul=2;label='子の一発ストップ';}
+  else{mul=1;label='通常ストップ';}
+  return{mul:mul*G.flowMul,label:label+(G.flowMul>1?' ×流れ'+G.flowMul:'')};
+}
+
+/* ===== レンダリング ===== */
+function render(){renderTurn();renderCpu(false);renderField();renderPiles();renderHand();renderActions();}
+
+function renderTurn(){
+  var cp=G.ps[G.cur];
+  var tl=document.getElementById('g-turn');
+  if(tl)tl.innerHTML=cp.name+'のターン'
+    +(G.cur===G.parent?'<span class="bdg bp">親</span>':'')
+    +(G.flowMul>1?'<span class="bdg bw">流れ×'+G.flowMul+'</span>':'');
+  var rl=document.getElementById('g-round');if(rl)rl.textContent='R'+G.round+'/'+G.maxR;
+}
+
+function renderCpu(revealed){
+  var cpu=G.ps[1];
+  var nl=document.getElementById('g-cpu-name');
+  if(nl)nl.innerHTML='CPU'+(1===G.parent?'<span class="bdg bp">親</span>':'')
+    +(G.cur===1&&!revealed?'<span class="bdg bg">考え中</span>':'')
+    +(revealed?'<span class="bdg bw">手札公開</span>':'');
+  var il=document.getElementById('g-cpu-info');
+  if(il)il.textContent=cpu.hand.length+'枚 / 累計: '+cpu.score+'pt'+(revealed?' 合計:'+hsumStop(cpu,false)+'点':'');
+  var area=document.getElementById('g-cpu-hand');if(!area)return;area.innerHTML='';
+  cpu.hand.forEach(function(c){
+    var el;
+    if(revealed){el=mkCardEl(c,false,true);}
+    else{
+      el=document.createElement('div');
+      el.style.cssText='width:32px;height:46px;border-radius:6px;background:#534AB7;border:1px solid #3C3489;color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0';
+      el.textContent='🂠';
+    }
+    area.appendChild(el);
+  });
+}
+
+function mkCardEl(c,selectable,small){
+  var w=small?'36px':'46px';var h=small?'52px':'66px';var fs=small?'13px':'15px';var ns=small?'11px':'13px';
+  var isSel=selectable&&G.sel.indexOf(c.id)>=0;
+  var el=document.createElement('div');
+  el.style.cssText='width:'+w+';height:'+h+';border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;user-select:none;flex-shrink:0;font-weight:600;transition:transform .1s;'
+    +'color:'+cardColor(c)+';background:'+(isSel?'#E1F5EE':cardBg(c))+';border:'+(isSel?'2px solid #1D9E75':'1px solid '+cardBorder(c))+';'
+    +'transform:'+(isSel?'translateY(-8px)':'none')+';';
+  if(c.joker)el.innerHTML='<span style="font-size:'+fs+';line-height:1.2">★</span><span style="font-size:'+ns+';line-height:1.3">JK</span>';
+  else el.innerHTML='<span style="font-size:'+fs+';line-height:1.2">'+c.suit+'</span><span style="font-size:'+ns+';line-height:1.3">'+vn(c.val)+'</span>';
+  return el;
+}
+
+function renderField(){
+  var ft=document.getElementById('g-field-title');
+  if(ft)ft.textContent=ADD_MODE?'場札（追加先をタップ）':'場札';
+  var area=document.getElementById('g-field');if(!area)return;
+  if(!G.field.length){area.innerHTML='<span style="font-size:13px;color:#9B9B95">まだありません</span>';return;}
+  area.innerHTML='';
+  G.field.forEach(function(meld,mi){
+    var w=document.createElement('div');
+    w.className='mw'+(ADD_MODE?' addtarget':'');
+    var lbl=document.createElement('div');lbl.className='ml';
+    lbl.textContent=meldLbl(meld)+(ADD_MODE?' ← タップして追加':'');w.appendChild(lbl);
+    var row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:4px';
+    meld.forEach(function(c){row.appendChild(mkCardEl(c,false,true));});
+    w.appendChild(row);
+    if(ADD_MODE){(function(idx){w.addEventListener('click',function(){doAddToMeld(idx);});})(mi);}
+    area.appendChild(w);
+  });
+}
+
+function meldLbl(m){
+  var nj=m.filter(function(c){return !c.joker;});var hasJ=m.some(function(c){return c.joker;});
+  if(nj.length&&nj.every(function(c){return c.val===nj[0].val;}))return '同数字 '+vn(nj[0].val)+(hasJ?'+JK':'')+'  ×'+m.length;
+  if(nj.length)return nj[0].suit+' 連番 ×'+m.length;return '組み合わせ';
+}
+
+function renderPiles(){
+  var dn=document.getElementById('g-deck-n');if(dn)dn.textContent=G.deck.length+'枚';
+  var discn=document.getElementById('g-disc-n');if(discn)discn.textContent=G.disc.length+'枚';
+  var dt=document.getElementById('g-disc-top');if(!dt)return;dt.innerHTML='';
+  if(G.disc.length){dt.appendChild(mkCardEl(G.disc[G.disc.length-1],false,false));}
+  else{
+    var ph=document.createElement('div');
+    ph.style.cssText='width:48px;height:68px;border-radius:8px;background:#F5F5F0;border:1px dashed #D0CFC8;display:flex;align-items:center;justify-content:center;font-size:11px;color:#9B9B95';
+    ph.textContent='なし';dt.appendChild(ph);
+  }
+}
+
+function renderHand(){
+  var p=G.ps[0];
+  var lbl=document.getElementById('g-my-lbl');if(lbl)lbl.textContent=p.name+'の手札 ('+p.hand.length+'枚)  合計: '+hsum(p)+'点';
+  var area=document.getElementById('g-my-hand');if(!area)return;area.innerHTML='';
+  sortH(p.hand).forEach(function(c){
+    var el=mkCardEl(c,true,false);
+    (function(card){el.addEventListener('click',function(){if(G.cur===0&&G.phase==='play')toggleSel(card);});})(c);
+    area.appendChild(el);
+  });
+}
+
+function sortH(h){
+  return h.slice().sort(function(a,b){
+    if(a.joker)return 1;if(b.joker)return -1;
+    if(a.suit!==b.suit)return SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit);
+    return a.val-b.val;
+  });
+}
+
+function renderActions(){
+  var ad=document.getElementById('g-act-draw'),ap=document.getElementById('g-act-play');
+  var hint=document.getElementById('g-add-hint'),jkPanel=document.getElementById('g-jk-panel');
+  var swapHint=document.getElementById('g-swap-hint'),cancelAdd=document.getElementById('g-cancel-add');
+  var btnPS=document.getElementById('btn-parent-stop');
+  if(!ad||!ap)return;
+  if(hint)hint.style.display='none';if(jkPanel)jkPanel.style.display='none';
+  if(swapHint)swapHint.style.display='none';if(cancelAdd)cancelAdd.style.display='none';
+  if(btnPS)btnPS.style.display='none';
+  var mine=G.cur===0&&!G.thinking;
+  if(ADD_MODE){if(cancelAdd)cancelAdd.style.display='block';}
+  else if(mine&&G.phase==='play'&&G.sel.length===1&&G.field.length>0){
+    var card=getSel()[0];
+    if(card.joker){
+      var jkOpts=buildJkPanelHtml(card);
+      if(jkOpts.hasOpts&&jkPanel){jkPanel.style.display='block';jkPanel.innerHTML=jkOpts.html;}
+    } else {
+      var canSwap=false,swapMi=-1;
+      G.field.forEach(function(meld,mi){if(canSwapJoker(meld,card)){canSwap=true;swapMi=mi;}});
+      if(canSwap&&swapHint){
+        swapHint.style.display='block';
+        var smi=swapMi;
+        swapHint.innerHTML='<div class="swap-hint"><span>'+cl(card)+'で場のJKと置き換えできます</span><button class="btn war" style="width:auto;padding:6px 14px;margin:0;font-size:13px" id="btn-sw">置き換える</button></div>';
+        document.getElementById('btn-sw').addEventListener('click',function(){execSwapJoker(smi);});
+      }
+      var canAdd=false;G.field.forEach(function(meld){if(valMeldAdd(meld,card))canAdd=true;});
+      if(canAdd&&hint){
+        hint.style.display='block';
+        hint.innerHTML='<div class="add-hint"><span>'+cl(card)+'を場の組に追加できます</span><button class="btn pri" style="width:auto;padding:6px 14px;margin:0;font-size:13px" id="btn-ae">追加する</button></div>';
+        document.getElementById('btn-ae').addEventListener('click',enterAddMode);
+      }
+    }
+  }
+  if(G.phase==='draw'){ad.style.display=mine?'block':'none';ap.style.display='none';}
+  else{ad.style.display='none';ap.style.display=mine?'block':'none';if(mine&&btnPS&&G.cur===G.parent&&G.ti===0)btnPS.style.display='block';}
+}
+
+/* ===== カード操作 ===== */
+function toggleSel(c){var i=G.sel.indexOf(c.id);if(i>=0)G.sel.splice(i,1);else G.sel.push(c.id);ADD_MODE=false;render();}
+function getSel(){return G.ps[0].hand.filter(function(c){return G.sel.indexOf(c.id)>=0;});}
+
+function drawDeck(){
+  if(G.cur!==0||G.phase!=='draw'||G.thinking)return;
+  if(!G.deck.length){setMsg('山札が尽きました。流れです。');handleDraw();return;}
+  var c=G.deck.pop();G.ps[0].hand.push(c);G.phase='play';G.sel=[];ADD_MODE=false;
+  addLog(G.ps[0].name+': 山札から '+cl(c)+' を引いた');render();setMsg(cl(c)+' を引きました。');
+}
+function drawDisc(){
+  if(G.cur!==0||G.phase!=='draw'||G.thinking)return;
+  if(!G.disc.length){setMsg('捨て札がありません。');return;}
+  var c=G.disc.pop();G.ps[0].hand.push(c);G.phase='play';G.sel=[];ADD_MODE=false;
+  addLog(G.ps[0].name+': 捨て札から '+cl(c)+' を取った');render();setMsg(cl(c)+' を取りました。');
+}
+
+function doStop(){
+  if(G.cur!==0||G.phase!=='draw'||G.thinking)return;
+  var info=getMultiInfo(false);
+  var s0=hsumStop(G.ps[0],true),s1=hsumStop(G.ps[1],false);var ok=s0<=s1;
+  addLog(G.ps[0].name+': ストップ宣言！['+info.label+'] ('+s0+' vs CPU:'+s1+')');
+  showStopModal(G.ps[0].name,s0,'CPU',s1,ok,info.mul,info.label,false,G.ps[1].hand);
+}
+function doParentFirstStop(){
+  if(G.cur!==0||G.phase!=='play'||G.thinking)return;
+  if(!(G.cur===G.parent&&G.ti===0)){setMsg('親の1巡目にのみ宣言できます。');return;}
+  var info=getMultiInfo(true);
+  var s0=hsumStop(G.ps[0],true),s1=hsumStop(G.ps[1],false);var ok=s0<=s1;
+  addLog(G.ps[0].name+': 親の一発ストップ！('+s0+' vs CPU:'+s1+')');
+  showStopModal(G.ps[0].name,s0,'CPU',s1,ok,info.mul,info.label,false,G.ps[1].hand);
+}
+
+function showStopModal(n0,s0,n1,s1,ok,mul,label,cpuD,cpuHand){
+  renderCpu(true);
+  var failMul=mul*2;
+  var h='<div class="mbg"><div class="mbox"><h2>🛑 ストップ宣言！</h2>';
+  h+='<p style="font-size:12px;color:#6B6B65;margin-bottom:10px">'+label+' / 成功×'+mul+' 失敗×'+failMul+'</p>';
+  h+='<div class="reveal-area"><div class="reveal-name">'+(cpuD?n1:n0)+'（宣言）の手札 — '+(cpuD?s1:s0)+'点</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
+  if(cpuD){cpuHand.forEach(function(c){h+=miniCardHtml(c,true);});}else{G.ps[0].hand.forEach(function(c){h+=miniCardHtml(c,true);});}
+  h+='</div></div>';
+  h+='<div class="reveal-area"><div class="reveal-name">'+(cpuD?n0:n1)+'の手札 — '+(cpuD?s0:s1)+'点</div><div style="display:flex;flex-wrap:wrap;gap:4px">';
+  if(cpuD){G.ps[0].hand.forEach(function(c){h+=miniCardHtml(c,false);});}else{cpuHand.forEach(function(c){h+=miniCardHtml(c,false);});}
+  h+='</div></div>';
+  h+='<div style="padding:9px;background:#F5F5F0;border-radius:9px;font-size:14px;margin-bottom:14px;font-weight:600">';
+  if(ok)h+='<span style="color:#1D9E75">✓ 成功！</span>  ×'+mul+'倍';
+  else h+='<span style="color:#D85A30">✗ 失敗（かぶり）</span>  ×'+failMul+'倍';
+  h+='</div>';
+  h+='<button class="btn pri" id="btn-resolve">確定 ↗</button></div></div>';
+  var m=document.getElementById('g-modal');if(!m)return;m.innerHTML=h;
+  document.getElementById('btn-resolve').addEventListener('click',function(){resolveStop(ok,mul,cpuD);});
+}
+function miniCardHtml(c,isStopper){
+  var col=c.joker?'#534AB7':(SC[c.suit]==='#D85A30'?'#D85A30':'#1A1A18');
+  var bg=c.joker?'#EEEDFE':'#FFFFFF';
+  var label=c.joker?'★JK':c.suit+vn(c.val);var val=c.joker?(isStopper?1:0):c.val;
+  return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:38px;height:52px;border-radius:6px;border:1px solid #E0DFD8;font-size:11px;font-weight:600;color:'+col+';background:'+bg+'"><span>'+label+'</span><span style="font-size:10px;color:#9B9B95">'+val+'点</span></div>';
+}
+function resolveStop(ok,mul,cpuD){
+  var m=document.getElementById('g-modal');if(m)m.innerHTML='';
+  renderCpu(false);G.flowMul=1;
+  var p=G.ps[0],cpu=G.ps[1];
+  if(!cpuD){if(ok){p.score+=mul;cpu.score-=mul;}else{p.score-=mul*2;cpu.score+=mul*2;}showResult('stop',ok,ok?p:cpu);}
+  else{if(ok){cpu.score+=mul;p.score-=mul;}else{cpu.score-=mul*2;p.score+=mul*2;}showResult('stop',!ok,!ok?p:cpu);}
+}
+
+/* ===== JK関連 ===== */
+function findJokerVal(meld){
+  var nj=meld.filter(function(c){return !c.joker;});if(!nj.length)return null;
+  if(nj.every(function(c){return c.val===nj[0].val;}))return{suit:null,val:nj[0].val};
+  var suit=nj[0].suit;var vals=nj.map(function(c){return c.val;}).sort(function(a,b){return a-b;});
+  for(var i=0;i<vals.length-1;i++){if(vals[i+1]-vals[i]===2)return{suit:suit,val:vals[i]+1};}
+  var jkPos=-1;for(var j=0;j<meld.length;j++){if(meld[j].joker){jkPos=j;break;}}
+  if(jkPos===0){if(vals[0]===2)return{suit:suit,val:1};if(vals[0]===1)return{suit:suit,val:13};return{suit:suit,val:vals[0]-1};}
+  if(jkPos===meld.length-1){if(vals[vals.length-1]===13)return{suit:suit,val:1};return{suit:suit,val:vals[vals.length-1]+1};}
+  return null;
+}
+function canSwapJoker(meld,card){
+  if(card.joker)return false;if(!meld.some(function(c){return c.joker;}))return false;
+  var nj=meld.filter(function(c){return !c.joker;});if(!nj.length)return false;
+  if(nj.every(function(c){return c.val===nj[0].val;}))return card.val===nj[0].val;
+  var jkVal=findJokerVal(meld);return jkVal&&jkVal.suit===card.suit&&jkVal.val===card.val;
+}
+function execSwapJoker(mi){
+  var sel=getSel();if(!sel.length||sel[0].joker)return;var card=sel[0];
+  if(!canSwapJoker(G.field[mi],card)){setMsg('置き換えできません。');return;}
+  var p=G.ps[0];var ci=p.hand.indexOf(card);if(ci<0)return;
+  var jkInMeld=null,jkMi=-1;for(var i=0;i<G.field[mi].length;i++){if(G.field[mi][i].joker){jkInMeld=G.field[mi][i];jkMi=i;break;}}
+  if(!jkInMeld)return;
+  p.hand.splice(ci,1);p.hand.push(jkInMeld);G.field[mi].splice(jkMi,1,card);
+  G.sel=[];ADD_MODE=false;addLog(p.name+': '+cl(card)+'で場のJKを置き換え（JKが手元に戻った）');
+  if(!p.hand.length){winOut(p);return;}render();setMsg('置き換えました。1枚捨ててターン終了。');
+}
+function buildJkPanelHtml(jokerCard){
+  var html='<div class="jk-panel"><div class="jk-panel-title">JKをどこに追加しますか？</div>';var hasOpts=false;
+  G.field.forEach(function(meld,mi){
+    var nj=meld.filter(function(c){return !c.joker;});if(!nj.length)return;
+    if(meld.length>=4&&nj.every(function(c){return c.val===nj[0].val;}))return;
+    var opts=getJokerAddOptions(meld);if(!opts.length)return;hasOpts=true;
+    opts.forEach(function(opt){
+      html+='<div class="jk-opt" data-mi="'+mi+'" data-pos="'+opt.pos+'" data-asval="'+opt.asVal+'">';
+      html+='<div class="jk-preview">'+buildPreview(meld,opt)+'</div>';
+      html+='<span style="flex:1;font-size:12px;color:#6B6B65">'+opt.label+'</span></div>';
+    });
+  });
+  html+='</div>';return{hasOpts:hasOpts,html:html};
+}
+function getJokerAddOptions(meld){
+  var nj=meld.filter(function(c){return !c.joker;});if(!nj.length)return[];
+  if(nj.every(function(c){return c.val===nj[0].val;})){if(meld.length>=4)return[];return[{pos:'same',asVal:nj[0].val,label:vn(nj[0].val)+'として追加'}];}
+  var suit=nj[0].suit;var vals=nj.map(function(c){return c.val;}).sort(function(a,b){return a-b;});var opts=[];
+  var lv=vals[0]-1;if(lv>=1)opts.push({pos:'left',asVal:lv,label:suit+vn(lv)+'の代わり（左端）'});
+  else if(vals[0]===2)opts.push({pos:'left',asVal:1,label:suit+'Aの代わり（左端）'});
+  if(vals[vals.length-1]===13)opts.push({pos:'right',asVal:14,label:suit+'A (K→A) の代わり（右端）'});
+  var rv=vals[vals.length-1]+1;if(rv<=13)opts.push({pos:'right',asVal:rv,label:suit+vn(rv)+'の代わり（右端）'});
+  return opts;
+}
+function buildPreview(meld,opt){
+  var jkHtml='<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:28px;height:38px;border-radius:5px;border:2px solid #1D9E75;background:#E1F5EE;font-size:10px;font-weight:600;color:#534AB7"><span>★</span><span style="font-size:8px">JK</span></div>';
+  var h='';
+  function mc(c){var col=c.joker?'#534AB7':(SC[c.suit]||'#1A1A18');var bg=c.joker?'#EEEDFE':'#FFFFFF';return '<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;width:28px;height:38px;border-radius:5px;border:1px solid #E0DFD8;font-size:10px;font-weight:600;color:'+col+';background:'+bg+'"><span>'+(c.joker?'★JK':c.suit+vn(c.val))+'</span></div>';}
+  if(opt.pos==='same'){meld.forEach(function(c){h+=mc(c);});h+=jkHtml;}
+  else if(opt.pos==='left'){h+=jkHtml;meld.forEach(function(c){h+=mc(c);});}
+  else{meld.forEach(function(c){h+=mc(c);});h+=jkHtml;}
+  return h;
+}
+function execJokerAdd(mi,pos,asVal){
+  var sel=getSel();if(!sel.length||!sel[0].joker)return;var joker=sel[0];var p=G.ps[0];var idx=p.hand.indexOf(joker);if(idx<0)return;
+  if(p.hand.length===1){setMsg('ジョーカーのみで上がることはできません。');return;}
+  p.hand.splice(idx,1);var newMeld=pos==='left'?[joker].concat(G.field[mi]):G.field[mi].concat([joker]);
+  G.field[mi]=newMeld;G.sel=[];ADD_MODE=false;addLog(p.name+': JKを場の組に追加（'+meldLbl(newMeld)+'）');
+  if(!p.hand.length){winOut(p);return;}render();setMsg('追加しました。1枚捨ててターン終了。');
+}
+
+/* ===== 場への追加 ===== */
+function enterAddMode(){var sel=getSel();if(sel.length!==1){setMsg('1枚だけ選んでください。');return;}if(!G.field.length){setMsg('場にまだ組がありません。');return;}ADD_MODE=true;render();setMsg('場の組（緑枠）をタップして追加。');}
+function cancelAddMode(){ADD_MODE=false;G.sel=[];render();setMsg('キャンセルしました。');}
+function doAddToMeld(mi){
+  if(!ADD_MODE)return;var sel=getSel();if(sel.length!==1){ADD_MODE=false;render();return;}var card=sel[0];
+  if(!valMeldAdd(G.field[mi],card)){setMsg('そのカードは追加できません。');ADD_MODE=false;G.sel=[];render();return;}
+  var idx=G.ps[0].hand.indexOf(card);if(idx<0){setMsg('手札が見つかりません。');ADD_MODE=false;render();return;}
+  G.ps[0].hand.splice(idx,1);G.field[mi]=G.field[mi].concat([card]);G.sel=[];ADD_MODE=false;
+  addLog(G.ps[0].name+': '+cl(card)+' を場に追加した');
+  if(!G.ps[0].hand.length){winOut(G.ps[0]);return;}render();setMsg('追加しました。1枚捨ててターン終了。');
+}
+
+/* ===== プレイ・捨て ===== */
+function doPlayNew(){
+  var sel=getSel();if(sel.length<3){setMsg('3枚以上選んでください。');return;}
+  if(!valMeld(sel)){setMsg('出せない組み合わせです。同数字3枚以上か、同絵柄の連番3枚以上を選んでください。');return;}
+  var p=G.ps[0];sel.forEach(function(c){p.hand.splice(p.hand.indexOf(c),1);});
+  G.field.push(sel.slice());G.sel=[];ADD_MODE=false;
+  addLog(G.ps[0].name+': '+sel.map(cl).join('')+' を場に出した');
+  if(!p.hand.length){winOut(p);return;}render();setMsg('場に出しました。1枚捨ててターン終了。');
+}
+function doDiscard(){
+  var sel=getSel();if(sel.length!==1){setMsg('捨てるカードを1枚だけ選んでください。');return;}
+  var c=sel[0];if(c.joker){setMsg('ジョーカーは捨てられません。');return;}
+  var p=G.ps[0];p.hand.splice(p.hand.indexOf(c),1);G.disc.push(c);G.sel=[];G.fd=true;ADD_MODE=false;
+  addLog(G.ps[0].name+': '+cl(c)+' を捨てた');if(!p.hand.length){winOut(p);return;}endTurn();
+}
+
+/* ===== 勝敗処理 ===== */
+function winOut(winner){
+  var loser=G.ps[winner===G.ps[0]?1:0];winner.score+=G.flowMul;loser.score-=G.flowMul;G.flowMul=1;
+  addLog(winner.name+': 手札0で上がり！');showResult('out',true,winner);
+}
+function handleDraw(){
+  G.flowMul*=2;addLog('山札切れ！流れ → 次ラウンドは×'+G.flowMul+'倍');showResult('draw',false,null);
+}
+function checkJokerTrap(pidx){
+  var p=G.ps[pidx];if(!isJokerTrapped(p))return false;
+  addLog('💀 '+p.name+': JK詰み！満貫払い -4pt');p.score-=4;G.ps[1-pidx].score+=2;
+  showResult('trap',false,p);return true;
+}
+
+function showResult(type,ok,p){
+  showScr('result');
+  var rr=document.getElementById('r-round');if(rr)rr.textContent='R'+G.round+' / '+G.maxR;
+  var rb=document.getElementById('r-body');if(!rb)return;var h='<div class="box">';
+  if(type==='out')h+='<p style="font-size:15px;font-weight:700;color:#1D9E75;margin-bottom:12px">🎉 '+(p?p.name:'—')+'が手札0で上がり！</p>';
+  else if(type==='stop'&&ok)h+='<p style="font-size:15px;font-weight:700;color:#1D9E75;margin-bottom:12px">✓ ストップ成功！ '+(p?p.name:'')+'の勝ち</p>';
+  else if(type==='stop'&&!ok)h+='<p style="font-size:15px;font-weight:700;color:#D85A30;margin-bottom:12px">✗ ストップ失敗… '+(p?p.name:'')+'の負け</p>';
+  else if(type==='trap')h+='<p style="font-size:15px;font-weight:700;color:#D85A30;margin-bottom:12px">💀 '+(p?p.name:'')+'がJK詰み！満貫払い -4pt</p>';
+  else h+='<p style="font-size:15px;font-weight:700;color:#BA7517;margin-bottom:12px">⚡ 流れ！次ラウンドは×'+G.flowMul+'倍</p>';
+  var sorted=G.ps.slice().sort(function(a,b){return b.score-a.score;});
+  h+='<table class="rtable"><tr><th>名前</th><th style="text-align:right">累計スコア</th></tr>';
+  sorted.forEach(function(pl,i){
+    var w=i===0?' class="win"':'';h+='<tr><td'+w+'>'+pl.name+(i===0?' 🏅':'')+'</td><td style="text-align:right"'+w+'>'+pl.score+'pt</td></tr>';
+  });
+  h+='</table></div>';rb.innerHTML=h;
+  var btn=document.getElementById('r-next');if(btn)btn.textContent=G.round>=G.maxR?'最終結果へ ↗':'次のラウンドへ ↗';
+}
+function nextRound(){
+  if(G.round>=G.maxR){goEnd();return;}G.round++;
+  G.parent=G.flowMul>1?Math.floor(Math.random()*2):1-G.parent;
+  G.cur=G.parent;dealRound();
+}
+function goEnd(){
+  showScr('end');var eb=document.getElementById('e-body');if(!eb)return;
+  var sorted=G.ps.slice().sort(function(a,b){return b.score-a.score;});
+  var h='<div class="box"><p style="font-size:16px;font-weight:700;margin-bottom:14px">🏆 最終結果（'+G.round+'ラウンド）</p>';
+  h+='<table class="rtable"><tr><th>順位</th><th>名前</th><th style="text-align:right">スコア</th></tr>';
+  sorted.forEach(function(p,i){var w=i===0?' class="win"':'';h+='<tr><td'+w+'>'+(i+1)+'位</td><td'+w+'>'+p.name+(i===0?' 🏆':'')+'</td><td style="text-align:right"'+w+'>'+p.score+'pt</td></tr>';});
+  h+='</table></div>';eb.innerHTML=h;
+}
+function resetGame(){showScr('setup');}
+
+/* ===== ターン終了 ===== */
+function endTurn(){
+  G.phase='draw';G.sel=[];G.ti++;ADD_MODE=false;G.cur=1-G.cur;
+  if(G.cur===0){if(checkJokerTrap(0))return;render();setMsg(G.ps[0].name+'のターンです。'+(G.flowMul>1?'（流れ×'+G.flowMul+'倍）':''));}
+  else{render();if(checkJokerTrap(1))return;G.thinking=true;setMsg('CPU が考えています…');render();setTimeout(cpuTurn,900);}
+}
+
+/* ===== バリデーション ===== */
+function valMeld(cards){
+  var nj=cards.filter(function(c){return !c.joker;});var jk=cards.filter(function(c){return c.joker;});
+  if(jk.length>1)return false;
+  if(jk.length===1)return nj.length>=2&&nj.every(function(c){return c.val===nj[0].val;});
+  if(cards.every(function(c){return c.val===cards[0].val;}))return true;
+  if(cards.length>=3&&cards.every(function(c){return c.suit===cards[0].suit;})){
+    var v=cards.map(function(c){return c.val;}).sort(function(a,b){return a-b;});
+    if(v.every(function(x,i){return i===0||x===v[i-1]+1;}))return true;
+    if(v[0]===1&&v[v.length-1]===13){var s=v.slice(1).concat([14]).sort(function(a,b){return a-b;});return s.every(function(x,i){return i===0||x===s[i-1]+1;});}
+  }
+  return false;
+}
+function valMeldAdd(meld,card){
+  var nj=meld.filter(function(c){return !c.joker;});
+  if(card.joker)return !(meld.length>=4&&nj.every(function(c){return c.val===nj[0].val;}));
+  if(nj.every(function(c){return c.val===nj[0].val;}))return card.val===nj[0].val&&meld.length<4;
+  var suit=nj.length?nj[0].suit:null;if(suit&&card.suit!==suit)return false;
+  var vals=nj.map(function(c){return c.val;}).sort(function(a,b){return a-b;});
+  return card.val===vals[0]-1||card.val===vals[vals.length-1]+1
+    ||(vals.indexOf(13)>=0&&card.val===1)||(vals.indexOf(1)>=0&&card.val===13);
+}
+
+/* ===== CPU ===== */
+function cpuTurn(){var cpu=G.ps[1];var action=cpuDecide(cpu);setTimeout(function(){execCpu(cpu,action);G.thinking=false;},500);}
+function cpuDecide(cpu){
+  var mySum=hsumStop(cpu,true);var isFirst=G.cur===G.parent&&G.ti===0;
+  var baseMul=isFirst?4:(!G.fd&&G.cur!==G.parent?2:1);var mul=baseMul*G.flowMul;
+  if(DIFF==='easy'){if(mySum<=5&&Math.random()<0.5)return{t:'stop'};}
+  else if(DIFF==='hard'){if(mySum<=4)return{t:'stop'};if(mySum<=8&&mul>=2)return{t:'stop'};}
+  else{if(mySum<=6)return{t:'stop'};if(mySum<=10&&mul>=2&&Math.random()<0.6)return{t:'stop'};}
+  var discTop=G.disc.length?G.disc[G.disc.length-1]:null;var wantDisc=false;
+  if(discTop&&!discTop.joker){var th=cpu.hand.concat([discTop]);if(findMelds(th).length>0||discTop.val<=3)wantDisc=true;}
+  return{t:'draw',disc:wantDisc};
+}
+function execCpu(cpu,action){
+  if(action.t==='stop'){
+    var isFirst=G.cur===G.parent&&G.ti===0;var info=getMultiInfo(isFirst);
+    var sc=hsumStop(cpu,true),sp=hsumStop(G.ps[0],false);var ok=sc<=sp;
+    addLog('CPU: ストップ宣言！['+info.label+'] (CPU:'+sc+' vs '+G.ps[0].name+':'+sp+')');
+    showStopModal('CPU',sc,G.ps[0].name,sp,ok,info.mul,info.label,true,cpu.hand);return;
+  }
+  var drawn;
+  if(action.disc&&G.disc.length){drawn=G.disc.pop();addLog('CPU: 捨て札から '+cl(drawn)+' を取った');}
+  else{if(!G.deck.length){handleDraw();return;}drawn=G.deck.pop();addLog('CPU: 山札から1枚引いた');}
+  cpu.hand.push(drawn);
+  var isFirst=G.cur===G.parent&&G.ti===0;
+  if(isFirst){
+    var as=hsumStop(cpu,true);var i2=getMultiInfo(true);
+    var sa=DIFF==='easy'?as<=3&&Math.random()<0.4:DIFF==='hard'?as<=2:as<=4;
+    if(sa){var sc2=hsumStop(cpu,true),sp2=hsumStop(G.ps[0],false);addLog('CPU: 親の一発ストップ！(CPU:'+sc2+' vs '+G.ps[0].name+':'+sp2+')');showStopModal('CPU',sc2,G.ps[0].name,sp2,sc2<=sp2,i2.mul,i2.label,true,cpu.hand);return;}
+  }
+  var melds=findMelds(cpu.hand);
+  if(melds.length>0){
+    var best=melds[0];var rem=cpu.hand.filter(function(c){return best.indexOf(c)<0;});
+    if(rem.length>0){best.forEach(function(c){cpu.hand.splice(cpu.hand.indexOf(c),1);});G.field.push(best.slice());addLog('CPU: '+best.map(cl).join('')+' を場に出した');if(!cpu.hand.length){G.thinking=false;winOut(cpu);return;}}
+  }
+  var td=cpuPickDiscard(cpu.hand);
+  if(td){cpu.hand.splice(cpu.hand.indexOf(td),1);G.disc.push(td);addLog('CPU: '+cl(td)+' を捨てた');if(!cpu.hand.length){G.thinking=false;winOut(cpu);return;}}
+  G.fd=true;G.cur=0;G.ti++;G.thinking=false;
+  if(checkJokerTrap(0))return;
+  render();setMsg(G.ps[0].name+'のターンです。'+(G.flowMul>1?'（流れ×'+G.flowMul+'倍）':''));
+}
+function findMelds(hand){
+  var res=[];var nj=hand.filter(function(c){return !c.joker;});var jk=hand.filter(function(c){return c.joker;});var byV={};
+  nj.forEach(function(c){if(!byV[c.val])byV[c.val]=[];byV[c.val].push(c);});
+  Object.keys(byV).forEach(function(v){var arr=byV[v];if(arr.length>=3)res.push(arr.slice());if(arr.length===2&&jk.length>0)res.push(arr.concat([jk[0]]));});
+  SUITS.forEach(function(s){var sv=nj.filter(function(c){return c.suit===s;}).sort(function(a,b){return a.val-b.val;});for(var i=0;i<sv.length;i++){var seq=[sv[i]];for(var j=i+1;j<sv.length;j++){if(sv[j].val===seq[seq.length-1].val+1)seq.push(sv[j]);else break;}if(seq.length>=3)res.push(seq.slice());}});
+  return res.sort(function(a,b){return b.length-a.length;});
+}
+function cpuPickDiscard(hand){var nj=hand.filter(function(c){return !c.joker;});if(!nj.length)return null;return nj.sort(function(a,b){return b.val-a.val;})[0];}
+</script>
+</body>
+</html>
