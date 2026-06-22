@@ -825,7 +825,7 @@ function doPlayNew(){
   var sel=getSel();
   if(sel.length<3){setMsg('3\u679a\u4ee5\u4e0a\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002');return;}
   if(!valMeld(sel)){setMsg('\u51fa\u305b\u306a\u3044\u7d44\u307f\u5408\u308f\u305b\u3067\u3059\u3002');return;}
-  var p=G.ps[0];
+  var p=G.ps[MY_IDX];
   sel.forEach(function(c){
     if(G.drawnCard&&G.drawnCard.id===c.id)G.drawnCard=null;
     else{var i=p.hand.indexOf(c);if(i>=0)p.hand.splice(i,1);}
@@ -842,6 +842,7 @@ function doPlayNew(){
   }
   G.sel=[];
   if(!p.hand.length&&!G.drawnCard){winOut(p);return;}
+  broadcastGameState();
   setMsg('\u5834\u306b\u51fa\u3057\u307e\u3057\u305f\u30011\u679a\u6368\u3066\u3066\u304f\u3060\u3055\u3044\u3002');renderAll();
 }
 
@@ -873,7 +874,7 @@ function doAddToField(forceSuit,forceMeldIdx,forceAsVal){
     return;
   }
   /* 追加実行 */
-  var p=G.ps[0];var fromDrawn=G.drawnCard&&G.drawnCard.id===card.id;
+  var p=G.ps[MY_IDX];var fromDrawn=G.drawnCard&&G.drawnCard.id===card.id;
   if(fromDrawn){G.drawnCard=null;}
   else{p.hand.splice(p.hand.indexOf(card),1);if(G.drawnCard){p.hand.push(G.drawnCard);G.drawnCard=null;}}
   if(target.type==='seq'){
@@ -892,7 +893,7 @@ function doSwapJoker(){
   if(sel.length!==1){setMsg('1\u679a\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002');return;}
   var card=sel[0];var target=canSwapJokerInField(card);
   if(!target){setMsg('\u4ea4\u63db\u3067\u304d\u307e\u305b\u3093\u3002');return;}
-  var p=G.ps[0];var jk;
+  var p=G.ps[MY_IDX];var jk;
   if(target.type==='same'){
     var meld=G.sameField[target.meldIdx];
     var ji=meld.cards.findIndex(function(c){return c.joker;});
@@ -913,7 +914,7 @@ function doSwapJoker(){
 }
 
 function doDiscard(){
-  var sel=getSel();var p=G.ps[0];
+  var sel=getSel();var p=G.ps[MY_IDX];
   if(sel.length!==1){setMsg('\u6368\u3066\u308b\u30ab\u30fc\u30c9\u30921\u679a\u9078\u3093\u3067\u304f\u3060\u3055\u3044\u3002');return;}
   var card=sel[0];
   if(card.joker){setMsg('\u30b8\u30e7\u30fc\u30ab\u30fc\u306f\u6368\u3066\u3089\u308c\u307e\u305b\u3093\u3002');return;}
