@@ -416,8 +416,21 @@ function handleMsg(name,data,timestamp){
       applyRemoteAction(data, timestamp);
     }
   }
+  else if(name==='game_state'){
+    if(data.playerIdx!==MY_IDX){
+      applyGameState(data);
+    }
+  }
+  else if(name==='next_round'){
+    G.round=data.round;
+    G.parent=data.parent;
+    G.cur=data.parent;
+    dealRoundWithSeed(data.seed);
+  }
+  else if(name==='round_result'){
+    applyRoundResult(data);
+  }
   else if(name==='pon_claim'){
-    /* JKポン先着判定 */
     handlePonClaim(data, timestamp);
   }
 }
@@ -472,12 +485,81 @@ function seededShuffle(arr,seed){
   return a;
 }
 
+/* ===== ゲーム状態を全員に送信 ===== */
+function broadcastGameState(){
+  /* G全体をシリアライズして送信 */
+  var state={
+    ps:G.ps.map(function(p){return{name:p.name,score:p.score,idx:p.idx,active:p.active,handCount:p.hand.length};}),
+    disc:G.disc,
+    seqField:G.seqField,
+    sameField:G.sameField,
+    cur:G.cur,parent:G.parent,round:G.round,
+    flowMul:G.flowMul,firstDiscard:G.firstDiscard,ti:G.ti,
+    phase:G.phase,
+    /* 自分の手札は送らない（他プレイヤーには見えないから） */
+    myHand:G.ps[MY_IDX]?G.ps[MY_IDX].hand:[],
+    playerIdx:MY_IDX,
+    deckCount:G.deck.length
+  };
+  sendMsg('game_state',state);
+}
+
 /* ===== アクション送信 ===== */
 function sendAction(type,data){
   data=data||{};
   data.playerIdx=MY_IDX;
   data.type=type;
   sendMsg('action',data);
+}
+
+/* ===== ラウンド結果を受信して反映 ===== */
+function applyRoundResult(data){
+  if(!G)return;
+  /* スコアを同期 */
+  data.scores.forEach(function(s){
+    if(G.ps[s.idx])G.ps[s.idx].score=s.score;
+  });
+  G.flowMul=data.flowMul||1;
+  var winner=data.winnerIdx!==undefined?G.ps[data.winnerIdx]:null;
+  showRoundResult(data.type,data.mul,winner);
+}
+
+/* ===== ゲーム状態を受信して反映 ===== */
+function applyGameState(state){
+  if(!G)return;
+  /* 他プレイヤーの手札枚数を更新 */
+  state.ps.forEach(function(sp){
+    if(sp.idx!==MY_IDX&&G.ps[sp.idx]){
+      /* 手札枚数に合わせて裏向きカードを調整 */
+      var p=G.ps[sp.idx];
+      p.score=sp.score;
+      /* 手札枚数を合わせる（裏向きカードで調整） */
+      while(p.hand.length<sp.handCount){
+        p.hand.push({suit:'?',val:0,id:'back_'+Math.random(),joker:false,back:true});
+      }
+      while(p.hand.length>sp.handCount){p.hand.pop();}
+    }
+  });
+  /* 捨て札を同期 */
+  G.disc=state.disc;
+  /* 場の状態を同期 */
+  G.seqField=state.seqField;
+  G.sameField=state.sameField;
+  /* ゲーム進行状態を同期 */
+  G.cur=state.cur;
+  G.round=state.round;
+  G.flowMul=state.flowMul;
+  G.firstDiscard=state.firstDiscard;
+  G.ti=state.ti;
+  G.phase=state.phase;
+  G.sel=[];
+  G.drawnCard=null;
+  renderAll();
+  if(G.cur===MY_IDX){
+    setMsg(G.ps[MY_IDX].name+'のターンです。');
+  } else {
+    setMsg(G.ps[G.cur].name+'のターンです…');
+  }
 }
 
 /* ===== リモートアクション適用 ===== */
@@ -684,6 +766,20 @@ function applyLayout(n){
   }
 }
 
+function dealRoundWithSeed(seed){
+  G.deck=seededShuffle(makeDeck(),seed);
+  G.disc=[];G.seqField={};G.sameField=[];
+  G.sel=[];G.phase='draw';G.ti=0;G.firstDiscard=false;G.drawnCard=null;
+  G.ps.forEach(function(p){p.hand=[];});
+  for(var i=0;i<7;i++)G.ps.forEach(function(p){if(p.active)p.hand.push(G.deck.pop());});
+  G.disc.push(G.deck.pop());
+  G.curActivePos=G.activePsIdx.indexOf(G.parent);
+  G.cur=G.parent;
+  applyLayout(G.numPlayers);
+  renderAll();
+  if(G.cur===MY_IDX)setMsg(G.ps[MY_IDX].name+'のターンです。');
+  else setMsg(G.ps[G.cur].name+'のターンです…');
+}
 function dealRound(){
   G.deck=sfl(makeDeck());G.disc=[];G.seqField={};G.sameField=[];
   G.sel=[];G.phase='draw';G.ti=0;G.firstDiscard=false;G.drawnCard=null;
@@ -787,6 +883,7 @@ function doAddToField(forceSuit,forceMeldIdx,forceAsVal){
   }
   G.sel=[];
   if(!p.hand.length){winOut(p);return;}
+  broadcastGameState();
   setMsg('追加しました、1枚捨ててください。');renderAll();
 }
 
@@ -811,6 +908,7 @@ function doSwapJoker(){
   p.hand.push(jk);
   G.sel=[];
   if(!p.hand.length){winOut(p);return;}
+  broadcastGameState();
   setMsg('JKと交換しました、1枚捨ててください。');renderAll();
 }
 
@@ -825,6 +923,7 @@ function doDiscard(){
   G.disc.push(card);G.sel=[];G.firstDiscard=true;
   sendAction('discard',{cardId:card.id});
   if(!p.hand.length){winOut(p);return;}
+  /* 捕て後にゲーム状態を全員に配信 */
   checkPonAndEndTurn();
 }
 
@@ -959,9 +1058,12 @@ function checkPonAndEndTurn(){
     showPonBanner();renderAll();
     PON_TIMER=setTimeout(function(){
       document.getElementById('pon-banner').classList.add('hidden');
-      PON_TARGET=null;PON_TIMER=null;endTurn();
+      PON_TARGET=null;PON_TIMER=null;
+      broadcastGameState();endTurn();
     },5000);
-  } else endTurn();
+  } else {
+    broadcastGameState();endTurn();
+  }
 }
 
 function isJokerTrapped(p){
@@ -1007,17 +1109,20 @@ function declareStop(){
   var isFirst=G.ti===0;var isParent=G.cur===G.parent;
   var baseMul=(isParent&&isFirst)?4:((!G.firstDiscard&&G.cur!==G.parent)?2:1);
   var mul=baseMul*G.flowMul;
-  var mySum=hsumStop(G.ps[0].hand,true);
-  var others=G.ps.filter(function(p){return p.idx!==0&&p.active;});
+  var me=G.ps[MY_IDX];
+  var mySum=hsumStop(me.hand,true);
+  var others=G.ps.filter(function(p){return p.idx!==MY_IDX&&p.active;});
+  /* 他プレイヤーの手札は個数しかないので徹底比較はホスト側に委ねる */
   var ok=others.every(function(p){return mySum<=hsumStop(p.hand,false);});
   G.flowMul=1;
-  if(ok){G.ps[0].score+=mul;others.forEach(function(p){p.score-=mul;});}
-  else{G.ps[0].score-=mul*2;others.forEach(function(p){p.score+=mul;});}
+  if(ok){me.score+=mul;others.forEach(function(p){p.score-=mul;});}
+  else{me.score-=mul*2;others.forEach(function(p){p.score+=mul;});}
+  sendMsg('round_result',{type:ok?'stop_ok':'stop_ng',mul:mul,stopperIdx:MY_IDX,
+    scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
   showRoundResult(ok?'stop_ok':'stop_ng',mul);
 }
 
 function winOut(winner){
-  /* JKあがり不可チェック */
   if(winner.hand.some(function(c){return c.joker;})){
     setMsg('ジョーカーが手札に残っているため上がれません。');
     return;
@@ -1025,9 +1130,14 @@ function winOut(winner){
   var mul=G.flowMul;G.flowMul=1;
   winner.score+=mul;
   G.ps.forEach(function(p){if(p!==winner&&p.active)p.score-=mul;});
+  sendMsg('round_result',{type:'out',mul:mul,winnerIdx:winner.idx,scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
   showRoundResult('out',mul,winner);
 }
-function handleFlow(){G.flowMul*=2;showRoundResult('flow',G.flowMul);}
+function handleFlow(){
+  G.flowMul*=2;
+  sendMsg('round_result',{type:'flow',flowMul:G.flowMul,scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
+  showRoundResult('flow',G.flowMul);
+}
 
 function showRoundResult(type,mul,winner){
   var t=type==='out'?'\ud83c\udf89 '+(winner?winner.name:'')+'\u304c\u4e0a\u304c\u308a\uff01':
@@ -1050,11 +1160,16 @@ function nextRound(){
   document.getElementById('result-modal').classList.add('hidden');
   if(G.round>=G.maxR){showEndResult();return;}
   G.round++;
-  /* 親をアクティブプレイヤーの中で順番に回す */
   var parentPos=(G.activePsIdx.indexOf(G.parent)+1)%G.activePsIdx.length;
   G.parent=G.activePsIdx[parentPos];
   G.cur=G.parent;
-  dealRound();
+  if(IS_HOST){
+    /* ホストが新しいseedで次のラウンドを開始 */
+    var seed=Math.floor(Math.random()*1000000);
+    sendMsg('next_round',{round:G.round,parent:G.parent,seed:seed});
+    dealRoundWithSeed(seed);
+  }
+  /* 参加者は next_round メッセージを待つ */
 }
 function showEndResult(){
   var sorted=G.ps.filter(function(p){return p.active;}).sort(function(a,b){return b.score-a.score;});
