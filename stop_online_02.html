@@ -358,12 +358,9 @@ function joinChannel(code){
 function onPlayerEnter(clientId, data){
   /* 既存チェック */
   if(PLAYERS.find(function(p){return p.clientId===clientId;}))return;
-  PLAYERS.push({clientId:clientId,name:data.name,connected:true});
-  /* ホストがインデックスを割り当て */
+  var idx=PLAYERS.length;
+  PLAYERS.push({clientId:clientId,name:data.name,idx:idx,connected:true});
   if(IS_HOST){
-    /* P1はホスト自身 */
-    var idx=PLAYERS.length-1;
-    PLAYERS[PLAYERS.length-1].idx=idx;
     broadcastPlayerList();
   }
   updateWaitingUI();
@@ -407,8 +404,11 @@ function handleMsg(name,data,timestamp){
   else if(name==='game_start'){
     PLAYERS=data.players;
     NUM_PLAYERS=data.numPlayers;
-    var me=PLAYERS.find(function(p){return p.name===MY_NAME;});
-    if(me)MY_IDX=me.idx;
+    /* 自分のインデックスを名前で特定 */
+    for(var i=0;i<PLAYERS.length;i++){
+      if(PLAYERS[i].name===MY_NAME){MY_IDX=i;break;}
+    }
+    /* ホストはMY_IDX=0なのでゲーム開始メッセージを自分でも処理 */
     initGame(data.players,data.numPlayers,data.seed);
   }
   else if(name==='action'){
@@ -984,8 +984,12 @@ function endTurn(){
   G.cur=G.activePsIdx[G.curActivePos];
   renderAll();
   if(checkJokerTrap(G.cur))return;
-  if(G.cur===0)setMsg(G.ps[0].name+'\u306e\u30bf\u30fc\u30f3\u3067\u3059\u3002');
-  else{setMsg(G.ps[G.cur].name+'\u304c\u8003\u3048\u3066\u3044\u307e\u3059\u2026');setTimeout(cpuTurn,900);}
+  if(G.cur===MY_IDX){
+    setMsg(G.ps[MY_IDX].name+'\u306e\u30bf\u30fc\u30f3\u3067\u3059\u3002');
+  } else {
+    setMsg(G.ps[G.cur].name+'\u306e\u30bf\u30fc\u30f3\u3067\u3059\u2026');
+    /* オンライン版は相手の操作を待つだけ。cpuTurnは呼び出さない */
+  }
 }
 
 function openStopModal(){
