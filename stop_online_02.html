@@ -382,14 +382,11 @@ function broadcastPlayerList(){
 /* ===== ホストがゲーム開始 ===== */
 function hostStartGame(){
   if(!IS_HOST)return;
-  /* 全員にゲーム開始を通知 */
-  sendMsg('game_start',{
-    players:PLAYERS,
-    numPlayers:NUM_PLAYERS,
-    seed:Math.floor(Math.random()*1000000)
-  });
-  /* 自分もゲーム開始 */
-  initGame(PLAYERS,NUM_PLAYERS,Math.floor(Math.random()*1000000));
+  var seed=Math.floor(Math.random()*1000000);
+  /* 全員にゲーム開始を通知（同じseed） */
+  sendMsg('game_start',{players:PLAYERS,numPlayers:NUM_PLAYERS,seed:seed});
+  /* 自分も同じseedで開始 */
+  initGame(PLAYERS,NUM_PLAYERS,seed);
 }
 
 /* ===== メッセージ送信 ===== */
@@ -430,11 +427,20 @@ function initGame(players,numPlayers,seed){
   document.getElementById('setup-scr').classList.add('hidden');
   /* シード付きデッキ生成（全員同じ手札に） */
   var seededDeck=seededShuffle(makeDeck(),seed);
-  var names=players.map(function(p,i){
-    return{name:p.name,hand:[],score:0,idx:i,active:i<numPlayers};
+  /* players配列はホストから渡る [{name,idx,...}] */
+  /* 4人分のスロットを用意してアクティブなものだけ埋める */
+  var names=[
+    {name:'',hand:[],score:0,idx:0,active:false},
+    {name:'',hand:[],score:0,idx:1,active:false},
+    {name:'',hand:[],score:0,idx:2,active:false},
+    {name:'',hand:[],score:0,idx:3,active:false}
+  ];
+  players.forEach(function(p,i){
+    if(i<4){
+      names[i].name=p.name||'P'+(i+1);
+      names[i].active=i<numPlayers;
+    }
   });
-  /* 非アクティブプレイヤーの名前を空に */
-  for(var i=numPlayers;i<4;i++){names[i].name='';names[i].active=false;}
   G={ps:names,
      deck:seededDeck,disc:[],seqField:{},sameField:[],
      cur:0,parent:0,round:1,maxR:10,phase:'draw',sel:[],
@@ -609,24 +615,7 @@ function setNumPlayers(n){
     var btn=document.getElementById('num-'+x);
     if(btn)btn.className='setup-num-btn'+(x===n?' active':'');
   });
-  /* 人数に応じて名前入力欄を表示/非表示 */
-  var p2i=document.getElementById('inp-p2');
-  var p3i=document.getElementById('inp-p3');
-  var p4i=document.getElementById('inp-p4');
-  if(p2i)p2i.style.display=n>=3?'':'none';
-  if(p3i)p3i.style.display=n>=2?'':'none';
-  if(p4i)p4i.style.display=n>=4?'':'none';
-  /* 2人のときP3上・P1下なのでラベルを調整 */
-  if(n===2){
-    document.getElementById('inp-p3').placeholder='P2 名前';
-  } else if(n===3){
-    document.getElementById('inp-p2').placeholder='P2 名前';
-    document.getElementById('inp-p3').placeholder='P3 名前';
-  } else {
-    document.getElementById('inp-p2').placeholder='P2 名前';
-    document.getElementById('inp-p3').placeholder='P3 名前';
-    document.getElementById('inp-p4').placeholder='P4 名前';
-  }
+  /* オンライン版は名前入力が1つなので他の入力欄は不要 */
 }
 
 function startGame(){
