@@ -254,6 +254,18 @@ html,body{width:100%;height:100%;background:#0a0a18;display:flex;align-items:fle
       </div>
     </div>
   </div>
+  <!-- 親決めモーダル -->
+  <div class="modal-bg hidden" id="parent-draw-modal">
+    <div class="modal-box">
+      <div class="modal-title">&#127183; 親決め</div>
+      <div class="modal-sub" style="margin-bottom:12px">カードを引いて一番強い人が親<br><small style="color:var(--txt2)">強さ: A &lt; 2 ... K &lt; JK</small></div>
+      <div id="parent-draw-cards" style="display:flex;justify-content:center;gap:10px;margin:14px 0;flex-wrap:wrap"></div>
+      <div id="parent-draw-result" style="text-align:center;font-size:14px;color:var(--p1);min-height:20px;font-weight:500;margin-bottom:8px"></div>
+      <div class="modal-btns hidden" id="parent-draw-btn-area">
+        <button class="modal-btn go" onclick="startNextRoundAfterDraw()">次のラウンドへ</button>
+      </div>
+    </div>
+  </div>
 </div>
 <script>
 var SP='\u2660',HT='\u2665',DM='\u2666',CL='\u2663';
@@ -264,6 +276,11 @@ var VN={1:'A',11:'J',12:'Q',13:'K'};
 var PCSS=['var(--p1)','var(--p2)','var(--p3)','var(--p4)'];
 var PCD=['var(--p1d)','var(--p2d)','var(--p3d)','var(--p4d)'];
 var G=null;
+var LAST_ROUND_TYPE=null;
+var LAST_WINNER_IDX=-1;
+var LAST_STOPPER_IDX=-1;
+var PARENT_DRAW_CARDS={};
+var PARENT_DRAW_SEED=0;
 
 function vn(v){return VN[v]||String(v)}
 function cl(c){return c.joker?'JK':c.suit+vn(c.val)}
@@ -414,6 +431,17 @@ function handleMsg(name,data,timestamp){
     if(data.playerIdx!==MY_IDX){
       applyGameState(data);
     }
+  }
+  else if(name==='parent_draw_start'){
+    PARENT_DRAW_SEED=data.seed;PARENT_DRAW_CARDS={};
+    document.getElementById('parent-draw-modal').classList.remove('hidden');
+    var rEl=document.getElementById('parent-draw-result');if(rEl)rEl.textContent='';
+    var bEl=document.getElementById('parent-draw-btn-area');if(bEl)bEl.classList.add('hidden');
+    renderParentDrawCards();
+  }
+  else if(name==='parent_draw_card'){
+    PARENT_DRAW_CARDS[data.playerIdx]=data.card;
+    checkParentDrawDone();
   }
   else if(name==='next_round'){
     G.round=data.round;
@@ -747,6 +775,17 @@ function applyLayout(n){
   }
 }
 
+function setNextParent(type,winnerIdx,stopperIdx){
+  var isParent=function(idx){return idx===G.parent;};
+  if(type==='out'){if(isParent(winnerIdx))return G.parent;return nextParentIdx();}
+  if(type==='stop_ok'){if(isParent(stopperIdx))return G.parent;return nextParentIdx();}
+  if(type==='stop_ng'){if(isParent(stopperIdx))return nextParentIdx();return G.parent;}
+  return nextParentIdx();
+}
+function nextParentIdx(){
+  var pos=(G.activePsIdx.indexOf(G.parent)+1)%G.activePsIdx.length;
+  return G.activePsIdx[pos];
+}
 function dealRoundWithSeed(seed){
   G.deck=seededShuffle(makeDeck(),seed);
   G.disc=[];G.seqField={};G.sameField=[];
@@ -1048,9 +1087,12 @@ function declareStop(){
   G.flowMul=1;
   if(ok){me.score+=mul;others.forEach(function(p){p.score-=mul;});}
   else{me.score-=mul*2;others.forEach(function(p){p.score+=mul;});}
-  sendMsg('round_result',{type:ok?'stop_ok':'stop_ng',mul:mul,stopperIdx:MY_IDX,
+  var rtype=ok?'stop_ok':'stop_ng';
+  LAST_ROUND_TYPE=rtype;LAST_STOPPER_IDX=MY_IDX;
+  if(IS_HOST)G.parent=setNextParent(rtype,-1,MY_IDX);
+  sendMsg('round_result',{type:rtype,mul:mul,stopperIdx:MY_IDX,nextParent:G.parent,
     scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
-  showRoundResult(ok?'stop_ok':'stop_ng',mul);
+  showRoundResult(rtype,mul);
 }
 
 function winOut(winner){
@@ -1061,11 +1103,14 @@ function winOut(winner){
   var mul=G.flowMul;G.flowMul=1;
   winner.score+=mul;
   G.ps.forEach(function(p){if(p!==winner&&p.active)p.score-=mul;});
-  sendMsg('round_result',{type:'out',mul:mul,winnerIdx:winner.idx,scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
+  LAST_ROUND_TYPE='out';LAST_WINNER_IDX=winner.idx;
+  if(IS_HOST)G.parent=setNextParent('out',winner.idx,-1);
+  sendMsg('round_result',{type:'out',mul:mul,winnerIdx:winner.idx,nextParent:G.parent,scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
   showRoundResult('out',mul,winner);
 }
 function handleFlow(){
   G.flowMul*=2;
+  LAST_ROUND_TYPE='flow';
   sendMsg('round_result',{type:'flow',flowMul:G.flowMul,scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
   showRoundResult('flow',G.flowMul);
 }
@@ -1091,17 +1136,18 @@ function nextRound(){
   document.getElementById('result-modal').classList.add('hidden');
   if(G.round>=G.maxR){showEndResult();return;}
   G.round++;
-  var parentPos=(G.activePsIdx.indexOf(G.parent)+1)%G.activePsIdx.length;
-  G.parent=G.activePsIdx[parentPos];
-  G.cur=G.parent;
+  if(LAST_ROUND_TYPE==='flow'){
+    if(IS_HOST)startParentDraw();
+    else document.getElementById('parent-draw-modal').classList.remove('hidden');
+    return;
+  }
   if(IS_HOST){
-    /* ホストが新しいseedで次のラウンドを開始 */
     var seed=Math.floor(Math.random()*1000000);
     sendMsg('next_round',{round:G.round,parent:G.parent,seed:seed});
     dealRoundWithSeed(seed);
   }
-  /* 参加者は next_round メッセージを待つ */
 }
+
 function showEndResult(){
   var sorted=G.ps.filter(function(p){return p.active;}).sort(function(a,b){return b.score-a.score;});
   var h="<div style='margin-top:10px'>";
@@ -1376,6 +1422,74 @@ function renderActions(){
     btns+="<button class='act-btn play' onclick='doPlayNew()'>\u5834\u306b\u51fa\u3059("+sel.length+"\u679a)</button>";
   actBar.innerHTML=btns;
 }
+function startParentDraw(){
+  PARENT_DRAW_CARDS={};
+  var seed=Math.floor(Math.random()*1000000);
+  PARENT_DRAW_SEED=seed;
+  sendMsg('parent_draw_start',{seed:seed});
+  document.getElementById('parent-draw-modal').classList.remove('hidden');
+  var rEl=document.getElementById('parent-draw-result');if(rEl)rEl.textContent='';
+  var bEl=document.getElementById('parent-draw-btn-area');if(bEl)bEl.classList.add('hidden');
+  renderParentDrawCards();
+}
+function renderParentDrawCards(){
+  var area=document.getElementById('parent-draw-cards');
+  if(!area||!G)return;
+  area.innerHTML='';
+  G.activePsIdx.forEach(function(pidx){
+    var card=PARENT_DRAW_CARDS[pidx];
+    var div=document.createElement('div');
+    div.style.cssText='display:flex;flex-direction:column;align-items:center;gap:4px';
+    var nameEl=document.createElement('div');
+    nameEl.style.cssText='font-size:10px;color:var(--txt2)';
+    nameEl.textContent=G.ps[pidx].name;
+    var cardEl=document.createElement('div');
+    cardEl.style.cssText='width:48px;height:68px;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:500;';
+    if(card){
+      var isRed=(card.suit===HT||card.suit===DM);
+      cardEl.style.background='#1e2e28';
+      cardEl.style.border='1.5px solid var(--p1)';
+      cardEl.style.color=card.joker?'#9988ff':(isRed?'#f08080':'#c8d8d0');
+      cardEl.innerHTML='<span style="font-size:18px">'+(card.joker?'\u2605':card.suit)+'</span><span>'+(card.joker?'JK':vn(card.val))+'</span>';
+    } else {
+      cardEl.style.cssText+='background:#3a3060;border:1.5px solid #534AB7;color:#9988ff;font-size:22px;cursor:pointer';
+      cardEl.textContent='\u{1F0D0}';
+      if(pidx===MY_IDX)(function(idx){cardEl.onclick=function(){doDrawParentCard(idx);};})(pidx);
+    }
+    div.appendChild(nameEl);div.appendChild(cardEl);
+    area.appendChild(div);
+  });
+}
+function doDrawParentCard(pidx){
+  if(PARENT_DRAW_CARDS[pidx])return;
+  var deck=seededShuffle(makeDeck(),PARENT_DRAW_SEED+pidx*7777);
+  var card=deck[0];
+  PARENT_DRAW_CARDS[pidx]=card;
+  sendMsg('parent_draw_card',{playerIdx:pidx,card:card});
+  checkParentDrawDone();
+}
+function checkParentDrawDone(){
+  renderParentDrawCards();
+  if(!G.activePsIdx.every(function(i){return PARENT_DRAW_CARDS[i];}))return;
+  var strength=function(c){if(c.joker)return 14;if(c.val===1)return 0;return c.val;};
+  var winner=G.activePsIdx.reduce(function(best,idx){
+    return strength(PARENT_DRAW_CARDS[idx])>strength(PARENT_DRAW_CARDS[best])?idx:best;
+  },G.activePsIdx[0]);
+  G.parent=winner;
+  var rEl=document.getElementById('parent-draw-result');
+  if(rEl)rEl.textContent=G.ps[winner].name+'が親になります！';
+  var bEl=document.getElementById('parent-draw-btn-area');
+  if(bEl)bEl.classList.remove('hidden');
+}
+function startNextRoundAfterDraw(){
+  document.getElementById('parent-draw-modal').classList.add('hidden');
+  if(IS_HOST){
+    var seed=Math.floor(Math.random()*1000000);
+    sendMsg('next_round',{round:G.round,parent:G.parent,seed:seed});
+    dealRoundWithSeed(seed);
+  }
+}
+
 /* 初期表示 */
 setNumPlayers(3);
 </script>
