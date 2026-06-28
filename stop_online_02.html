@@ -1258,6 +1258,18 @@ function findMelds(hand){
   return res.sort(function(a,b){return b.length-a.length;});
 }
 
+function getViewIdx(){
+  /* 自分(MY_IDX)を基準に他プレイヤーの表示位置を計算 */
+  var active=G.activePsIdx;
+  var myPos=active.indexOf(MY_IDX);
+  if(myPos<0)myPos=0;
+  var n=active.length;
+  return {
+    p2: active[(myPos+1)%n],  /* 左隣 */
+    p3: active[(myPos+2)%n],  /* 対面（上） */
+    p4: active[(myPos+3)%n]   /* 右隣 */
+  };
+}
 function renderAll(){
   if(!G)return;
   renderTopbar();renderP3();renderP2();renderP4();
@@ -1273,21 +1285,21 @@ function renderTopbar(){
 }
 function mkBackCard(){var d=document.createElement('div');d.textContent='\ud83c\udcd0';return d;}
 function renderP3(){
-  var p=G.ps[2];
+  var vi=getViewIdx();var p=G.ps[vi.p3];
   document.getElementById('p3-name-lbl').textContent=p.name;
   document.getElementById('p3-count-lbl').textContent=p.hand.length+'\u679a';
   var area=document.getElementById('p3-cards');area.innerHTML='';
   p.hand.forEach(function(){var d=mkBackCard();d.className='card-mini';area.appendChild(d);});
 }
 function renderP2(){
-  var p=G.ps[1];
+  var vi=getViewIdx();var p=G.ps[vi.p2];
   document.getElementById('p2-name-lbl').textContent=p.name;
   document.getElementById('p2-count-lbl').textContent=p.hand.length+'\u679a';
   var area=document.getElementById('p2-cards');area.innerHTML='';
   p.hand.forEach(function(){var d=mkBackCard();d.className='card-vert';d.style.color='#7ab';area.appendChild(d);});
 }
 function renderP4(){
-  var p=G.ps[3];
+  var vi=getViewIdx();var p=G.ps[vi.p4];
   document.getElementById('p4-name-lbl').textContent=p.name;
   document.getElementById('p4-count-lbl').textContent=p.hand.length+'\u679a';
   var area=document.getElementById('p4-cards');area.innerHTML='';
@@ -1371,7 +1383,7 @@ function renderSameField(){
   });
 }
 function renderHand(){
-  var p=G.ps[0];
+  var p=G.ps[MY_IDX];
   var sorted=p.hand.slice().sort(function(a,b){
     if(a.joker)return 1;if(b.joker)return -1;
     if(a.suit!==b.suit)return SUITS.indexOf(a.suit)-SUITS.indexOf(b.suit);
@@ -1400,7 +1412,7 @@ function renderHand(){
     drawEl.style.transform=sel?'translateY(-7px)':'';
     drawEl.style.boxShadow=sel?'0 0 10px rgba(127,255,212,.5)':'0 0 6px rgba(127,255,212,.3)';
     drawEl.innerHTML="<span style='font-size:16px;line-height:1.2'>"+(dc.joker?'\u2605':dc.suit)+"</span><span style='font-size:11px'>"+(dc.joker?'JK':vn(dc.val))+'</span>';
-    (function(card){drawEl.onclick=function(){if(G.cur===0&&G.phase==='play')toggleSel(card.id);};})(dc);
+    (function(card){drawEl.onclick=function(){if(G.cur===MY_IDX&&G.phase==='play')toggleSel(card.id);};})(dc);
   } else {
     drawEl.style.cssText='width:36px;height:52px;border-radius:5px;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;background:#3a3060;border:1.5px solid #534AB7;color:#9988ff;font-size:22px;';
     drawEl.innerHTML='\ud83c\udcd0';drawEl.onclick=function(){drawDeck();};
