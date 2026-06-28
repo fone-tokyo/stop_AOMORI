@@ -554,7 +554,8 @@ function applyGameState(state){
   G.ti=state.ti;
   G.phase=state.phase;
   G.sel=[];
-  G.drawnCard=null;
+  /* drawnCard は自分のターン中は保持する（null にしない） */
+  if(G.cur!==MY_IDX) G.drawnCard=null;
   renderAll();
   if(G.cur===MY_IDX){
     setMsg(G.ps[MY_IDX].name+'のターンです。');
@@ -800,7 +801,7 @@ function toggleSel(id){
   renderHand();renderActions();
 }
 function getSel(){
-  var arr=G.ps[0].hand.filter(function(c){return G.sel.indexOf(c.id)>=0;});
+  var arr=G.ps[MY_IDX].hand.filter(function(c){return G.sel.indexOf(c.id)>=0;});
   if(G.drawnCard&&G.sel.indexOf(G.drawnCard.id)>=0)arr.push(G.drawnCard);
   return arr;
 }
@@ -1010,7 +1011,7 @@ function findJokerVal(meld){
   return null;
 }
 function checkPon(){
-  PON_TARGET=null;var p=G.ps[0];
+  PON_TARGET=null;var p=G.ps[MY_IDX];
   for(var mi=0;mi<G.sameField.length;mi++){
     var meld=G.sameField[mi];
     if(!meld.cards.some(function(c){return c.joker;}))continue;
@@ -1038,7 +1039,7 @@ function showPonBanner(){
 function execPon(){
   if(!PON_TARGET)return;
   if(PON_TIMER){clearTimeout(PON_TIMER);PON_TIMER=null;}
-  var p=G.ps[0];var jk;
+  var p=G.ps[MY_IDX];var jk;
   if(PON_TARGET.meldType==='same'){
     var meld=G.sameField[PON_TARGET.meldIdx];
     var ji=meld.cards.findIndex(function(c){return c.joker;});
@@ -1099,7 +1100,7 @@ function endTurn(){
 
 function openStopModal(){
   if(G.cur!==0||G.phase!=='draw')return;
-  var mySum=hsumStop(G.ps[0].hand,true);
+  var mySum=hsumStop(G.ps[MY_IDX].hand,true);
   document.getElementById('stop-modal-body').innerHTML=
     "<div style='background:#0f0f1e;border-radius:8px;padding:12px;text-align:center'>"+
     "<div style='font-size:11px;color:var(--txt2);margin-bottom:4px'>\u3042\u306a\u305f\u306e\u624b\u672d\u5408\u8a08</div>"+
