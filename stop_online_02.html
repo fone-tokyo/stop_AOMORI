@@ -1060,9 +1060,11 @@ function endTurn(){
 
 function openStopModal(){
   if(G.cur!==MY_IDX)return;
-  /* 親の一発は phase==='play'でもOK、それ以外は phase==='draw'のみ */
-  var isParentFirst=G.cur===G.parent&&G.ti===0&&G.phase==='play';
-  if(!isParentFirst&&G.phase!=='draw')return;
+  var isParentTurn=G.cur===G.parent&&G.ti===0;
+  var isParentFirst=isParentTurn&&G.phase==='play';
+  /* 親の最初のターンは引いた後(play)のみ、それ以外は引く前(draw)のみ */
+  if(isParentTurn&&!isParentFirst)return;
+  if(!isParentTurn&&G.phase!=='draw')return;
   var mySum=hsumStop(G.ps[MY_IDX].hand,true);
   document.getElementById('stop-modal-body').innerHTML=
     "<div style='background:#0f0f1e;border-radius:8px;padding:12px;text-align:center'>"+
@@ -1079,22 +1081,21 @@ function declareStop(){
   /* 子の一発：子の最初のターン引く前（7枚状態）で宣言 */
   var isChildFirst=!isParent&&!G.firstDiscard&&G.ti>0&&G.phase==='draw';
   var baseMul=isParentFirst?4:(isChildFirst?2:1);
-  var mul=baseMul*G.flowMul;
+  var mul=baseMul*G.flowMul; /* 成功・失敗共通の倍率 */
   var me=G.ps[MY_IDX];
   var mySum=hsumStop(me.hand,true);
   var others=G.ps.filter(function(p){return p.idx!==MY_IDX&&p.active;});
-  /* 他プレイヤーの手札は個数しかないので徹底比較はホスト側に委ねる */
   var ok=others.every(function(p){return mySum<=hsumStop(p.hand,false);});
   G.flowMul=1;
   var n=others.length;
   if(ok){
-    /* 成功：宣言者は相手人数×mul獲得、相手は各mul失う */
+    /* 成功：宣言者+n×mul、相手各-mul */
     me.score+=n*mul;
     others.forEach(function(p){p.score-=mul;});
   } else {
-    /* 失敗：宣言者は相手人数×mul失う、相手は各mul獲得（mulは成功時と同じ） */
-    me.score-=n*mul;
-    others.forEach(function(p){p.score+=mul;});
+    /* 失敗：宣言者-n×mul×2、相手各+mul×2 */
+    me.score-=n*mul*2;
+    others.forEach(function(p){p.score+=mul*2;});
   }
   var rtype=ok?'stop_ok':'stop_ng';
   LAST_ROUND_TYPE=rtype;LAST_STOPPER_IDX=MY_IDX;
@@ -1209,8 +1210,8 @@ function cpuStop(cpu){
     cpu.score+=n2*mul;
     others.forEach(function(p){p.score-=mul;});
   } else {
-    cpu.score-=n2*mul;
-    others.forEach(function(p){p.score+=mul;});
+    cpu.score-=n2*mul*2;
+    others.forEach(function(p){p.score+=mul*2;});
   }
   renderAll();showRoundResult(ok?'stop_ok':'stop_ng',mul);
 }
@@ -1420,8 +1421,14 @@ function renderActions(){
   var stopBtn=document.getElementById('stop-btn');
   var actBar=document.getElementById('act-bar');
   /* STOPボタン表示条件 */
-  var isParentFirst=G.cur===G.parent&&G.ti===0&&G.phase==='play';
-  if(isMine&&(G.phase==='draw'||isParentFirst))stopBtn.classList.remove('hidden');
+  var isParentTurn=G.cur===G.parent&&G.ti===0; /* 親の最初のターン */
+  var isParentFirst=isParentTurn&&G.phase==='play'; /* 親一発：引いた後のみ */
+  /* 親の最初のターンは引く前(draw)はSTOP不可、引いた後(play)のみ可 */
+  var canStop=isMine&&(
+    (!isParentTurn&&G.phase==='draw') || /* 通常：引く前OK（親の最初以外） */
+    isParentFirst /* 親一発：引いた後のみ */
+  );
+  if(canStop)stopBtn.classList.remove('hidden');
   else stopBtn.classList.add('hidden');
   if(!isMine||G.phase!=='play'){actBar.classList.add('hidden');return;}
   var sel=getSel();
