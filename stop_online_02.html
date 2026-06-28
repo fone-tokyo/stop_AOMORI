@@ -536,12 +536,16 @@ function sendAction(type,data){
 /* ===== ラウンド結果を受信して反映 ===== */
 function applyRoundResult(data){
   if(!G)return;
-  /* スコアを同期 */
   data.scores.forEach(function(s){
     if(G.ps[s.idx])G.ps[s.idx].score=s.score;
   });
   G.flowMul=data.flowMul||1;
-  var winner=data.winnerIdx!==undefined?G.ps[data.winnerIdx]:null;
+  if(data.nextParent!==undefined)G.parent=data.nextParent;
+  /* 次のラウンドで使うためLAST_ROUND_TYPEを必ず設定 */
+  LAST_ROUND_TYPE=data.type;
+  LAST_WINNER_IDX=data.winnerIdx!=null?data.winnerIdx:-1;
+  LAST_STOPPER_IDX=data.stopperIdx!=null?data.stopperIdx:-1;
+  var winner=data.winnerIdx!=null?G.ps[data.winnerIdx]:null;
   showRoundResult(data.type,data.mul,winner);
 }
 
