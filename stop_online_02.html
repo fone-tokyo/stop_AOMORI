@@ -547,6 +547,7 @@ function applyGameState(state){
   G.sameField=state.sameField;
   /* ゲーム進行状態を同期 */
   G.cur=state.cur;
+  G.curActivePos=G.activePsIdx.indexOf(state.cur);
   G.round=state.round;
   G.flowMul=state.flowMul;
   G.firstDiscard=state.firstDiscard;
@@ -1060,10 +1061,10 @@ function checkPonAndEndTurn(){
     PON_TIMER=setTimeout(function(){
       document.getElementById('pon-banner').classList.add('hidden');
       PON_TARGET=null;PON_TIMER=null;
-      broadcastGameState();endTurn();
+      endTurn();
     },5000);
   } else {
-    broadcastGameState();endTurn();
+    endTurn();
   }
 }
 
@@ -1085,13 +1086,14 @@ function endTurn(){
   G.phase='draw';G.sel=[];G.drawnCard=null;G.ti++;
   G.curActivePos=(G.curActivePos+1)%G.activePsIdx.length;
   G.cur=G.activePsIdx[G.curActivePos];
+  broadcastGameState();
   renderAll();
   if(checkJokerTrap(G.cur))return;
   if(G.cur===MY_IDX){
     setMsg(G.ps[MY_IDX].name+'\u306e\u30bf\u30fc\u30f3\u3067\u3059\u3002');
   } else {
     setMsg(G.ps[G.cur].name+'\u306e\u30bf\u30fc\u30f3\u3067\u3059\u2026');
-    /* オンライン版は相手の操作を待つだけ。cpuTurnは呼び出さない */
+
   }
 }
 
