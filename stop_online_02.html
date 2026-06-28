@@ -1019,7 +1019,10 @@ function endTurn(){
 }
 
 function openStopModal(){
-  if(G.cur!==0||G.phase!=='draw')return;
+  if(G.cur!==MY_IDX)return;
+  /* 親の一発は phase==='play'でもOK、それ以外は phase==='draw'のみ */
+  var isParentFirst=G.cur===G.parent&&G.ti===0&&G.phase==='play';
+  if(!isParentFirst&&G.phase!=='draw')return;
   var mySum=hsumStop(G.ps[MY_IDX].hand,true);
   document.getElementById('stop-modal-body').innerHTML=
     "<div style='background:#0f0f1e;border-radius:8px;padding:12px;text-align:center'>"+
@@ -1030,8 +1033,12 @@ function openStopModal(){
 function closeStopModal(){document.getElementById('stop-modal').classList.add('hidden');}
 function declareStop(){
   closeStopModal();
-  var isFirst=G.ti===0;var isParent=G.cur===G.parent;
-  var baseMul=(isParent&&isFirst)?4:((!G.firstDiscard&&G.cur!==G.parent)?2:1);
+  var isParent=G.cur===G.parent;
+  /* 親の一発：親の最初のターンに1枚引いた後（8枚状態）で宣言 */
+  var isParentFirst=isParent&&G.ti===0&&G.phase==='play';
+  /* 子の一発：子の最初のターン引く前（7枚状態）で宣言 */
+  var isChildFirst=!isParent&&!G.firstDiscard&&G.ti>0&&G.phase==='draw';
+  var baseMul=isParentFirst?4:(isChildFirst?2:1);
   var mul=baseMul*G.flowMul;
   var me=G.ps[MY_IDX];
   var mySum=hsumStop(me.hand,true);
@@ -1130,8 +1137,12 @@ function cpuTurn(){
   renderAll();endTurn();
 }
 function cpuStop(cpu){
-  var isFirst=G.ti===0;var isParent=G.cur===G.parent;
-  var baseMul=(isParent&&isFirst)?4:((!G.firstDiscard&&G.cur!==G.parent)?2:1);
+  var isParent=G.cur===G.parent;
+  /* 親の一発：親の最初のターンに1枚引いた後（8枚状態）で宣言 */
+  var isParentFirst=isParent&&G.ti===0&&G.phase==='play';
+  /* 子の一発：子の最初のターン引く前（7枚状態）で宣言 */
+  var isChildFirst=!isParent&&!G.firstDiscard&&G.ti>0&&G.phase==='draw';
+  var baseMul=isParentFirst?4:(isChildFirst?2:1);
   var mul=baseMul*G.flowMul;G.flowMul=1;
   var mySum=hsumStop(cpu.hand,true);
   var others=G.ps.filter(function(p){return p!==cpu&&p.active;});
@@ -1345,7 +1356,9 @@ function renderActions(){
   var isMine=G.cur===MY_IDX;
   var stopBtn=document.getElementById('stop-btn');
   var actBar=document.getElementById('act-bar');
-  if(isMine&&G.phase==='draw')stopBtn.classList.remove('hidden');
+  /* STOPボタン表示条件 */
+  var isParentFirst=G.cur===G.parent&&G.ti===0&&G.phase==='play';
+  if(isMine&&(G.phase==='draw'||isParentFirst))stopBtn.classList.remove('hidden');
   else stopBtn.classList.add('hidden');
   if(!isMine||G.phase!=='play'){actBar.classList.add('hidden');return;}
   var sel=getSel();
