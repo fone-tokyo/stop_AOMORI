@@ -281,6 +281,7 @@ var LAST_WINNER_IDX=-1;
 var LAST_STOPPER_IDX=-1;
 var PARENT_DRAW_CARDS={};
 var PARENT_DRAW_SEED=0;
+var PARENT_DRAW_ALL={};
 
 function vn(v){return VN[v]||String(v)}
 function cl(c){return c.joker?'JK':c.suit+vn(c.val)}
@@ -434,6 +435,7 @@ function handleMsg(name,data,timestamp){
   }
   else if(name==='parent_draw_start'){
     PARENT_DRAW_SEED=data.seed;PARENT_DRAW_CARDS={};
+    PARENT_DRAW_ALL=data.allCards||{};
     document.getElementById('parent-draw-modal').classList.remove('hidden');
     var rEl=document.getElementById('parent-draw-result');if(rEl)rEl.textContent='';
     var bEl=document.getElementById('parent-draw-btn-area');if(bEl)bEl.classList.add('hidden');
@@ -482,14 +484,13 @@ function initGame(players,numPlayers,seed){
   G.activePsIdx=G.ps.reduce(function(arr,p,i){if(p.active)arr.push(i);return arr;},[]);
   G.curActivePos=0;G.cur=G.activePsIdx[0];G.parent=G.activePsIdx[0];
   applyLayout(numPlayers);
-  /* 手札配布 */
-  for(var i=0;i<7;i++)G.ps.forEach(function(p){if(p.active)p.hand.push(G.deck.pop());});
-  G.disc.push(G.deck.pop());
   renderAll();
-  setMsg(G.ps[G.cur].name+'のターンです。');
-  /* 自分のターンでなければ待機 */
-  if(G.cur!==MY_IDX){
-    setMsg(G.ps[G.cur].name+'が考えています…');
+  /* 最初は親汾めからスタート */
+  if(IS_HOST){
+    startParentDraw();
+  } else {
+    /* 参加者は parent_draw_start メッセージを待つ */
+    setMsg('親汾め中…');
   }
 }
 
@@ -1085,8 +1086,16 @@ function declareStop(){
   /* 他プレイヤーの手札は個数しかないので徹底比較はホスト側に委ねる */
   var ok=others.every(function(p){return mySum<=hsumStop(p.hand,false);});
   G.flowMul=1;
-  if(ok){me.score+=mul;others.forEach(function(p){p.score-=mul;});}
-  else{me.score-=mul*2;others.forEach(function(p){p.score+=mul;});}
+  var n=others.length;
+  if(ok){
+    /* 成功：宣言者は相手人数×mul獲得、相手は各mul失う */
+    me.score+=n*mul;
+    others.forEach(function(p){p.score-=mul;});
+  } else {
+    /* 失敗：宣言者は相手人数×mul失う、相手は各mul獲得（mulは成功時と同じ） */
+    me.score-=n*mul;
+    others.forEach(function(p){p.score+=mul;});
+  }
   var rtype=ok?'stop_ok':'stop_ng';
   LAST_ROUND_TYPE=rtype;LAST_STOPPER_IDX=MY_IDX;
   if(IS_HOST)G.parent=setNextParent(rtype,-1,MY_IDX);
@@ -1101,8 +1110,10 @@ function winOut(winner){
     return;
   }
   var mul=G.flowMul;G.flowMul=1;
-  winner.score+=mul;
-  G.ps.forEach(function(p){if(p!==winner&&p.active)p.score-=mul;});
+  var activeOthers=G.ps.filter(function(p){return p!==winner&&p.active;});
+  /* 上がり：勝者は相手人数×mul獲得、相手は各mul失う */
+  winner.score+=activeOthers.length*mul;
+  activeOthers.forEach(function(p){p.score-=mul;});
   LAST_ROUND_TYPE='out';LAST_WINNER_IDX=winner.idx;
   if(IS_HOST)G.parent=setNextParent('out',winner.idx,-1);
   sendMsg('round_result',{type:'out',mul:mul,winnerIdx:winner.idx,nextParent:G.parent,scores:G.ps.map(function(p){return{idx:p.idx,score:p.score};})});
@@ -1193,8 +1204,14 @@ function cpuStop(cpu){
   var mySum=hsumStop(cpu.hand,true);
   var others=G.ps.filter(function(p){return p!==cpu&&p.active;});
   var ok=others.every(function(p){return mySum<=hsumStop(p.hand,false);});
-  if(ok){cpu.score+=mul;others.forEach(function(p){p.score-=mul;});}
-  else{cpu.score-=mul*2;others.forEach(function(p){p.score+=mul;});}
+  var n2=others.length;
+  if(ok){
+    cpu.score+=n2*mul;
+    others.forEach(function(p){p.score-=mul;});
+  } else {
+    cpu.score-=n2*mul;
+    others.forEach(function(p){p.score+=mul;});
+  }
   renderAll();showRoundResult(ok?'stop_ok':'stop_ng',mul);
 }
 
@@ -1426,7 +1443,15 @@ function startParentDraw(){
   PARENT_DRAW_CARDS={};
   var seed=Math.floor(Math.random()*1000000);
   PARENT_DRAW_SEED=seed;
-  sendMsg('parent_draw_start',{seed:seed});
+  /* ホストが全員分のカードを事前に決めて送信 */
+  var allCards={};
+  G.activePsIdx.forEach(function(pidx){
+    var deck=seededShuffle(makeDeck(),seed+pidx*7777);
+    allCards[pidx]=deck[0];
+  });
+  sendMsg('parent_draw_start',{seed:seed,allCards:allCards});
+  /* ホスト自身はカードを隐した状態で表示 */
+  PARENT_DRAW_ALL=allCards;
   document.getElementById('parent-draw-modal').classList.remove('hidden');
   var rEl=document.getElementById('parent-draw-result');if(rEl)rEl.textContent='';
   var bEl=document.getElementById('parent-draw-btn-area');if(bEl)bEl.classList.add('hidden');
@@ -1453,7 +1478,7 @@ function renderParentDrawCards(){
       cardEl.innerHTML='<span style="font-size:18px">'+(card.joker?'\u2605':card.suit)+'</span><span>'+(card.joker?'JK':vn(card.val))+'</span>';
     } else {
       cardEl.style.cssText+='background:#3a3060;border:1.5px solid #534AB7;color:#9988ff;font-size:22px;cursor:pointer';
-      cardEl.textContent='\u{1F0D0}';
+      cardEl.innerHTML='&#127136;';
       if(pidx===MY_IDX)(function(idx){cardEl.onclick=function(){doDrawParentCard(idx);};})(pidx);
     }
     div.appendChild(nameEl);div.appendChild(cardEl);
@@ -1462,8 +1487,9 @@ function renderParentDrawCards(){
 }
 function doDrawParentCard(pidx){
   if(PARENT_DRAW_CARDS[pidx])return;
-  var deck=seededShuffle(makeDeck(),PARENT_DRAW_SEED+pidx*7777);
-  var card=deck[0];
+  /* ホストが全員分のカードを事前に決めているので山才から取る */
+  var card=PARENT_DRAW_ALL[pidx];
+  if(!card)return;
   PARENT_DRAW_CARDS[pidx]=card;
   sendMsg('parent_draw_card',{playerIdx:pidx,card:card});
   checkParentDrawDone();
