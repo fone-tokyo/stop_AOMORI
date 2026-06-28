@@ -67,10 +67,7 @@ html,body{width:100%;height:100%;background:#0a0a18;display:flex;align-items:fle
 .same-card.jk{background:#2a2050;border-color:#7F77DD;color:#9988ff}
 .same-card.red{color:#f08080}
 .same-card.blk{color:#e0e0e0}
-.pon-banner{background:#2a2050;border:1px solid #7F77DD;border-radius:6px;margin:3px 8px;padding:5px 10px;display:flex;align-items:center;gap:8px;flex-shrink:0}
-.pon-text{font-size:10px;color:#9988ff;flex:1}
-.pon-btn{background:#534AB7;border:none;border-radius:4px;color:white;font-size:10px;padding:4px 10px;cursor:pointer;flex-shrink:0}
-.pon-banner.hidden,.stop-btn.hidden,.act-bar.hidden,.modal-bg.hidden,.setup-scr.hidden{display:none}
+.stop-btn.hidden,.act-bar.hidden,.modal-bg.hidden,.setup-scr.hidden{display:none}
 .wait-msg{font-size:11px;color:var(--txt2);text-align:center;padding:4px 0 2px;flex-shrink:0;min-height:22px}
 .act-bar{display:flex;gap:6px;padding:4px 8px;flex-shrink:0;background:#0a0a14;border-top:0.5px solid var(--brd)}
 .act-btn{flex:1;padding:8px 4px;border-radius:7px;border:none;font-size:12px;font-weight:500;cursor:pointer}
@@ -213,10 +210,7 @@ html,body{width:100%;height:100%;background:#0a0a18;display:flex;align-items:fle
       <div id="p4-cards"></div>
     </div>
   </div>
-  <div class="pon-banner hidden" id="pon-banner">
-    <button class="pon-btn" onclick="execPon()">交換！</button>
-    <div class="pon-text" id="pon-text">JK交換チャンス！</div>
-  </div>
+
   <div class="wait-msg" id="wait-msg"></div>
   <div class="act-bar hidden" id="act-bar"></div>
   <div class="p1-area">
@@ -269,7 +263,7 @@ var SID={};SID[SP]='spade';SID[HT]='heart';SID[DM]='diamond';SID[CL]='club';
 var VN={1:'A',11:'J',12:'Q',13:'K'};
 var PCSS=['var(--p1)','var(--p2)','var(--p3)','var(--p4)'];
 var PCD=['var(--p1d)','var(--p2d)','var(--p3d)','var(--p4d)'];
-var G=null,PON_TARGET=null,PON_TIMER=null;
+var G=null;
 
 function vn(v){return VN[v]||String(v)}
 function cl(c){return c.joker?'JK':c.suit+vn(c.val)}
@@ -430,9 +424,7 @@ function handleMsg(name,data,timestamp){
   else if(name==='round_result'){
     applyRoundResult(data);
   }
-  else if(name==='pon_claim'){
-    handlePonClaim(data, timestamp);
-  }
+
 }
 
 /* ===== ゲーム初期化（全員共通） ===== */
@@ -557,6 +549,7 @@ function applyGameState(state){
   /* drawnCard は自分のターン中は保持する（null にしない） */
   if(G.cur!==MY_IDX) G.drawnCard=null;
   renderAll();
+
   if(G.cur===MY_IDX){
     setMsg(G.ps[MY_IDX].name+'のターンです。');
   } else {
@@ -632,20 +625,6 @@ function applyRemoteAction(data, timestamp){
 }
 
 /* ===== JKポン先着判定 ===== */
-var PON_CLAIMS={};
-function claimPon(){
-  var ts=Date.now();
-  PON_CLAIMS[MY_IDX]=ts;
-  sendMsg('pon_claim',{playerIdx:MY_IDX,timestamp:ts,meldType:PON_TARGET.meldType,
-    meldIdx:PON_TARGET.meldIdx,suit:PON_TARGET.suit,jkVal:PON_TARGET.jkVal,targetVal:PON_TARGET.targetVal});
-}
-function handlePonClaim(data,ablyTimestamp){
-  if(!PON_CLAIMS[data.playerIdx]||ablyTimestamp<PON_CLAIMS[data.playerIdx]){
-    PON_CLAIMS[data.playerIdx]=ablyTimestamp;
-  }
-}
-
-/* ===== UI表示制御 ===== */
 function showConnecting(msg){
   document.getElementById('host-area').style.display='none';
   document.getElementById('join-area').style.display='none';
@@ -927,7 +906,7 @@ function doDiscard(){
   sendAction('discard',{cardId:card.id});
   if(!p.hand.length){winOut(p);return;}
   /* 捕て後にゲーム状態を全員に配信 */
-  checkPonAndEndTurn();
+  endTurn();
 }
 
 function getSeqRange(sm){
@@ -1010,65 +989,6 @@ function findJokerVal(meld){
   /* ただし getSeqRange では端として扱うため null でよい */
   return null;
 }
-function checkPon(){
-  PON_TARGET=null;var p=G.ps[MY_IDX];
-  for(var mi=0;mi<G.sameField.length;mi++){
-    var meld=G.sameField[mi];
-    if(!meld.cards.some(function(c){return c.joker;}))continue;
-    var nj=meld.cards.filter(function(c){return !c.joker;});
-    if(!nj.length)continue;var tv=nj[0].val;
-    if(p.hand.some(function(c){return !c.joker&&c.val===tv;})){PON_TARGET={meldType:'same',meldIdx:mi,targetVal:tv};return true;}
-  }
-  var suits=Object.keys(G.seqField);
-  for(var si=0;si<suits.length;si++){
-    var s=suits[si];var sm=G.seqField[s];
-    if(!sm.some(function(c){return c.joker;}))continue;
-    var jv=findJokerVal(sm);if(!jv)continue;
-    if(p.hand.some(function(c){return !c.joker&&c.suit===s&&c.val===jv.val;})){PON_TARGET={meldType:'seq',suit:s,jkVal:jv.val};return true;}
-  }
-  return false;
-}
-function showPonBanner(){
-  if(!PON_TARGET){document.getElementById('pon-banner').classList.add('hidden');return;}
-  var hint=PON_TARGET.meldType==='same'
-    ?'JK\u4ea4\u63db\u30c1\u30e3\u30f3\u30b9\uff01 '+vn(PON_TARGET.targetVal)+'\u3067\u7f6e\u304d\u63db\u3048\u3089\u308c\u307e\u3059'
-    :'JK\u4ea4\u63db\u30c1\u30e3\u30f3\u30b9\uff01 '+PON_TARGET.suit+vn(PON_TARGET.jkVal)+'\u3067\u7f6e\u304d\u63db\u3048\u3089\u308c\u307e\u3059';
-  document.getElementById('pon-text').textContent=hint;
-  document.getElementById('pon-banner').classList.remove('hidden');
-}
-function execPon(){
-  if(!PON_TARGET)return;
-  if(PON_TIMER){clearTimeout(PON_TIMER);PON_TIMER=null;}
-  var p=G.ps[MY_IDX];var jk;
-  if(PON_TARGET.meldType==='same'){
-    var meld=G.sameField[PON_TARGET.meldIdx];
-    var ji=meld.cards.findIndex(function(c){return c.joker;});
-    var mc=p.hand.find(function(c){return !c.joker&&c.val===PON_TARGET.targetVal;});
-    if(!mc)return;jk=meld.cards[ji];meld.cards[ji]=mc;
-    p.hand.splice(p.hand.indexOf(mc),1);p.hand.push(jk);
-  } else {
-    var sm=G.seqField[PON_TARGET.suit];
-    var ji2=sm.findIndex(function(c){return c.joker;});
-    var mc2=p.hand.find(function(c){return !c.joker&&c.suit===PON_TARGET.suit&&c.val===PON_TARGET.jkVal;});
-    if(!mc2)return;jk=sm[ji2];sm[ji2]=mc2;
-    p.hand.splice(p.hand.indexOf(mc2),1);p.hand.push(jk);
-  }
-  document.getElementById('pon-banner').classList.add('hidden');
-  PON_TARGET=null;setMsg('JK\u3068\u4ea4\u63db\u3057\u307e\u3057\u305f\uff01');renderAll();endTurn();
-}
-function checkPonAndEndTurn(){
-  if(checkPon()){
-    showPonBanner();renderAll();
-    PON_TIMER=setTimeout(function(){
-      document.getElementById('pon-banner').classList.add('hidden');
-      PON_TARGET=null;PON_TIMER=null;
-      endTurn();
-    },5000);
-  } else {
-    endTurn();
-  }
-}
-
 function isJokerTrapped(p){
   if(!p.hand.length)return false;
   if(!p.hand.every(function(c){return c.joker;}))return false;
