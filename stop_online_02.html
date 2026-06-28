@@ -1280,10 +1280,12 @@ function renderAll(){
 function setMsg(m){document.getElementById('wait-msg').textContent=m;}
 function renderTopbar(){
   var cp=G.ps[G.cur];var badge=document.getElementById('turn-badge');
-  badge.textContent=cp.name+'\u306e\u30bf\u30fc\u30f3';
+  var isParent=G.cur===G.parent;
+  badge.textContent=cp.name+(isParent?'(親)':'')+'のターン';
   badge.style.background=PCSS[G.cur];badge.style.color=PCD[G.cur];
+  var parentName=G.ps[G.parent]?G.ps[G.parent].name:'';
   document.getElementById('round-info').textContent=
-    'R'+G.round+'/'+G.maxR+(G.flowMul>1?' | \u6d41\u308c\xd7'+G.flowMul:'');
+    'R'+G.round+'/'+G.maxR+' 親:'+parentName+(G.flowMul>1?' |流れ×'+G.flowMul:'');
 }
 function mkBackCard(){var d=document.createElement('div');d.textContent='\ud83c\udcd0';return d;}
 function renderP3(){
